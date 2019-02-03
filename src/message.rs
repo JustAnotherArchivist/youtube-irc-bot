@@ -112,6 +112,13 @@ pub fn handle_message(
 
         num_processed += 1;
     };
+
+    let command_channel = "#youtubearchive";
+    if message.response_target() == Some(command_channel) {
+        if msg.starts_with("!status") {
+            client.send_privmsg(command_channel, "Status.").unwrap();
+        }
+    }
 }
 
 // regex for unsafe characters, as defined in RFC 1738
