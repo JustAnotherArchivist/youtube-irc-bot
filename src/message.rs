@@ -113,7 +113,7 @@ pub fn handle_message(
         num_processed += 1;
     };
 
-    let command_channel = "#youtubearchive";
+    let command_channel = &rtd.conf.params.command_channel;
     if message.response_target() == Some(command_channel) {
         if msg.starts_with("!status") {
             client.send_privmsg(command_channel, "Status.").unwrap();

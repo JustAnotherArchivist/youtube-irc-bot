@@ -9,17 +9,18 @@ history = false
 url_limit = 10
 user_agent = "Mozilla/5.0"
 accept_lang = "en"
+command_channel = "#youtubearchive"
 
 [database]
 path = ""
 type = "in-memory"
 
 [connection]
-nickname = "url-bot-rs"
+nickname = "sucker"
 nick_password = ""
-alt_nicks = ["url-bot-rs_"]
-username = "url-bot-rs"
-realname = "url-bot-rs"
+alt_nicks = ["sucker_"]
+username = "sucker"
+realname = "sucker"
 server = "chat.freenode.net"
 port = 6697
 password = ""
@@ -27,7 +28,7 @@ use_ssl = true
 encoding = "UTF-8"
 channels = []
 user_info = "Feed me URLs."
-source = "https://github.com/nuxeh/url-bot-rs"
+source = "https://github.com/video-archivist/sucker"
 ping_time = 180
 ping_timeout = 10
 burst_window_length = 8
