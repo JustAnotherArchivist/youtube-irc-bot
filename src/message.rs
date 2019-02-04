@@ -3,9 +3,11 @@ use std::iter;
 use std::str;
 use std::error;
 use std::process;
+use std::time::{SystemTime, UNIX_EPOCH};
 use unicode_segmentation::UnicodeSegmentation;
 use reqwest::Url;
 use regex::Regex;
+use itertools::Itertools;
 
 use super::http::resolve_url;
 use super::sqlite::{Database, NewLogEntry};
@@ -119,7 +121,7 @@ pub fn handle_message(
     let command_channel = &rtd.conf.params.command_channel;
     if message.response_target() == Some(command_channel) {
         if msg.starts_with("!status") {
-            client.send_privmsg(command_channel, format!("#{:?}", get_downloader_sessions().unwrap())).unwrap();
+            client.send_privmsg(command_channel, get_status()).unwrap();
         }
     }
 }
@@ -128,6 +130,28 @@ pub fn handle_message(
 struct DownloaderSession {
     identifier: String,
     start_time: u64,
+}
+
+fn get_status() -> String {
+    match get_downloader_sessions() {
+        Err(e) => format!("{:?}", e),
+        Ok(mut sessions) => {
+            sessions.sort_by_key(|session| session.start_time);
+            sessions.reverse();
+            sessions.iter().map(|session| {
+                format!("{} ({})", session.identifier, shorthand_duration(session.start_time))
+            }).join(", ")
+        }
+    }
+}
+
+fn shorthand_duration(start_time: u64) -> String {
+    let start = SystemTime::now();
+    let since_the_epoch = start.duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
+    let time_now = since_the_epoch.as_secs();
+    let duration = time_now - start_time;
+    return format!("{}", duration);
 }
 
 fn get_downloader_sessions() -> Result<Vec<DownloaderSession>, Box<error::Error>> {
