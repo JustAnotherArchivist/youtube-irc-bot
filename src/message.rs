@@ -120,10 +120,16 @@ pub fn handle_message(
 
     let command_channel = &rtd.conf.params.command_channel;
     if message.response_target() == Some(command_channel) {
-        if msg.starts_with("!status") {
-            client.send_privmsg(command_channel, get_status()).unwrap();
+        match msg.as_ref() {
+            "!help"   => client.send_privmsg(command_channel, get_help()).unwrap(),
+            "!status" => client.send_privmsg(command_channel, get_status()).unwrap(),
+            _other    => {},
         }
     }
+}
+
+fn get_help() -> String {
+    "!help | !status | !a <user or channel or playlist or /watch URL>".into()
 }
 
 #[derive(Debug)]
