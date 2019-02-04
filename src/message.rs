@@ -1,5 +1,8 @@
 use irc::client::prelude::*;
 use std::iter;
+use std::str;
+use std::error;
+use std::process;
 use unicode_segmentation::UnicodeSegmentation;
 use reqwest::Url;
 use regex::Regex;
@@ -116,9 +119,38 @@ pub fn handle_message(
     let command_channel = &rtd.conf.params.command_channel;
     if message.response_target() == Some(command_channel) {
         if msg.starts_with("!status") {
-            client.send_privmsg(command_channel, "Status.").unwrap();
+            client.send_privmsg(command_channel, format!("#{:?}", get_downloader_sessions().unwrap())).unwrap();
         }
     }
+}
+
+#[derive(Debug)]
+struct DownloaderSession {
+    identifier: String,
+    start_time: u64,
+}
+
+fn get_downloader_sessions() -> Result<Vec<DownloaderSession>, Box<error::Error>> {
+    let output = process::Command::new("tmux")
+        .arg("list-sessions")
+        .arg("-F")
+        .arg("#{session_created} #S")
+        .output()?;
+    let stdout_utf8 = str::from_utf8(&output.stdout)?;
+    let sessions =
+        stdout_utf8.lines()
+            .filter_map(|line| {
+                let parts = line.splitn(2, ' ').collect::<Vec<&str>>();
+                let start_time   = parts.get(0).unwrap().parse::<u64>().unwrap();
+                let session_name = parts.get(1).unwrap();
+                if session_name.starts_with("YouTube-") {
+                    let identifier   = session_name.replacen("YouTube-", "", 1);
+                    Some(DownloaderSession { identifier, start_time })
+                } else {
+                    None
+                }
+            }).collect();
+    Ok(sessions)
 }
 
 // regex for unsafe characters, as defined in RFC 1738
