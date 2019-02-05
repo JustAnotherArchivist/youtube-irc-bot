@@ -16,11 +16,11 @@ path = ""
 type = "in-memory"
 
 [connection]
-nickname = "sucker"
+nickname = "botnick"
 nick_password = ""
-alt_nicks = ["sucker_"]
-username = "sucker"
-realname = "sucker"
+alt_nicks = ["botnick_"]
+username = "botnick"
+realname = "botnick"
 server = "chat.freenode.net"
 port = 6697
 password = ""
@@ -28,7 +28,7 @@ use_ssl = true
 encoding = "UTF-8"
 channels = []
 user_info = "Feed me URLs."
-source = "https://github.com/video-archivist/sucker"
+source = "https://github.com/video-archivist/youtube-irc-bot"
 ping_time = 180
 ping_timeout = 10
 burst_window_length = 8
