@@ -1,4 +1,5 @@
 use irc::client::prelude::*;
+use std::collections::HashMap;
 use std::iter;
 use std::str;
 use std::error;
@@ -128,7 +129,7 @@ pub fn handle_message(
                 client.send_privmsg(command_channel, get_status()).unwrap()
             },
             msg if msg.starts_with("!q ") => {
-                let url= msg.splitn(1, ' ').collect::<Vec<&str>>().get(1).unwrap();
+                let url = msg.splitn(1, ' ').last().unwrap();
                 client.send_privmsg(command_channel, get_query(&url)).unwrap()
             },
             _other => {},
@@ -147,16 +148,19 @@ fn get_query(url: &str) -> String {
         Some(f) => f,
         None => return format!("Could not get folder for URL {}", url),
     };
-    let videos =
-        get_file_listing(&folder)
-            .iter()
-            .filter(|s: &str| {
-                match s.rsplitn(1, '.').collect::<Vec<&str>>().last() {
-                    Some(&ext) => ext == "mp4" || ext == "webm" || ext == "flv" || ext == "mkv" || ext == "video",
-                    None       => false,
-                }
-            })
-            .collect();
+    let listing = match get_file_listing(&folder) {
+        Err(e) => return format!("Internal error listing files for {}: {}", url, e),
+        Ok(files) => files,
+    };
+    let videos = listing
+        .into_iter()
+        .filter(|s: &String| {
+            match s.rsplitn(1, '.').collect::<Vec<&str>>().last() {
+                Some(&ext) => ext == "mp4" || ext == "webm" || ext == "flv" || ext == "mkv" || ext == "video",
+                None       => false,
+            }
+        })
+        .collect::<Vec<String>>();
     format!("{} has {} videos", folder, videos.len())
 }
 
@@ -167,26 +171,27 @@ fn canonicalize_url(url: &str) -> String {
     "".into()
 }
 
-fn folder_for_url(url: &str) -> Option<&str> {
+fn folder_for_url(url: &str) -> Option<String> {
     let url = url::Url::parse(url).unwrap();
-    let folder: Option<&str> = match url.path() {
+    let folder: Option<String> = match url.path() {
         "/playlist" => {
-            if let Some((_, pl)) = url.query_pairs().find(|&(ref key, _)| key == "playlist") {
-                Some(&pl)
+            let keys: HashMap<_, _> = url.query_pairs().into_owned().collect();
+            if let Some(playlist) = keys.get("playlist") {
+                Some(playlist.clone())
             } else {
                 None
             }
         },
         p if p.starts_with("/user/") => {
-            if let Some(user) = p.splitn(4, '/').collect::<Vec<&str>>().get(2) {
-                Some(user)
+            if let Some(user) = p.splitn(4, '/').map(String::from).collect::<Vec<String>>().get(2) {
+                Some(user.clone())
             } else {
                 None
             }
         },
         p if p.starts_with("/channel/") => {
-            if let Some(channel) = p.splitn(4, '/').collect::<Vec<&str>>().get(2) {
-                Some(channel)
+            if let Some(channel) = p.splitn(4, '/').map(String::from).collect::<Vec<String>>().get(2) {
+                Some(channel.clone())
             } else {
                 None
             }
@@ -195,7 +200,7 @@ fn folder_for_url(url: &str) -> Option<&str> {
     };
     let re = regex::Regex::new(r"\A[-_A-Za-z0-9]+\z").unwrap();
     match folder {
-        Some(f) if re.is_match(f) => Some(f),
+        Some(ref f) if re.is_match(f) => Some(f.clone()),
         _ => None
     }
 }
