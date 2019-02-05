@@ -231,12 +231,7 @@ fn folder_for_url(url: &str) -> Option<String> {
 
 fn get_file_listing(folder: &str) -> Result<Vec<String>, Box<error::Error>> {
     let output = process::Command::new("ts")
-        .arg("ls")
-        .arg("-n")
-        .arg("YouTube")
-        .arg("-j")
-        .arg("-rt")
-        .arg(folder)
+        .arg("ls").arg("-n").arg("YouTube").arg("-j").arg("-rt").arg(folder)
         .output()?;
     let stdout_utf8 = str::from_utf8(&output.stdout)?;
     Ok(stdout_utf8.lines().map(String::from).collect())
