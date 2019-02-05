@@ -243,7 +243,7 @@ fn get_file_listing(folder: &str) -> Result<Vec<String>, Box<error::Error>> {
 }
 
 fn get_help() -> String {
-    "Usage: !help | !status | !a <user or channel or playlist or /watch URL> | !q <user or channel or playlist or /watch URL>".into()
+    "Usage: !help | !status | !a <user or channel URL> | !q <user or channel URL>".into()
 }
 
 #[derive(Debug)]
