@@ -8,7 +8,6 @@ use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 use unicode_segmentation::UnicodeSegmentation;
 use regex::Regex;
-use itertools::Itertools;
 
 use super::http::get_youtube_user;
 use super::sqlite::Database;
@@ -159,11 +158,8 @@ fn get_query(url: &str) -> Result<String, Box<error::Error>> {
             }
         })
         .collect::<Vec<String>>();
-    let latest_string = match videos.last() {
-        Some(video) => format!(", latest {:?}", video),
-        None        => format!(""),
-    };
-    Ok(format!("stash has {} videos for {}{}", videos.len(), &folder, latest_string))
+    let latest_videos = videos.iter().take(4).collect::<Vec<_>>();
+    Ok(format!("stash has {} videos for {}, latest {:?}", videos.len(), &folder, latest_videos))
 }
 
 /// Ensure that a YouTube URL actually exists and convert https://www.youtube.com/channel/*
@@ -231,7 +227,7 @@ fn folder_for_url(url: &str) -> Option<String> {
 
 fn get_file_listing(folder: &str) -> Result<Vec<String>, Box<error::Error>> {
     let output = process::Command::new("ts")
-        .arg("ls").arg("-n").arg("YouTube").arg("-j").arg("-rt").arg(folder)
+        .arg("ls").arg("-n").arg("YouTube").arg("-j").arg("-t").arg(folder)
         .output()?;
     let stdout_utf8 = str::from_utf8(&output.stdout)?;
     Ok(stdout_utf8.lines().map(String::from).collect())
