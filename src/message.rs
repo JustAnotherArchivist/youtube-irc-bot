@@ -28,7 +28,7 @@ pub fn handle_message(
         _ => return,
     };
 
-    let _user = message.source_nickname().unwrap();
+    let user = message.source_nickname().unwrap();
 
     let command_channel = &rtd.conf.params.command_channel;
     if message.response_target() == Some(command_channel) {
@@ -42,8 +42,8 @@ pub fn handle_message(
             msg if msg.starts_with("!q ") => {
                 let url = msg.splitn(2, ' ').last().unwrap();
                 match get_query(&url) {
-                    Ok(reply) => client.send_privmsg(command_channel, reply).unwrap(),
-                    Err(err)  => client.send_privmsg(command_channel, format!("Internal error: {:?}", err)).unwrap()
+                    Ok(reply) => client.send_privmsg(command_channel, format!("{}: {}", user, reply)).unwrap(),
+                    Err(err)  => client.send_privmsg(command_channel, format!("{}: error: {}", user, err)).unwrap()
                 }
             },
             _other => {},
@@ -104,7 +104,11 @@ fn get_query(url: &str) -> Result<String, Box<error::Error>> {
             }
         })
         .collect::<Vec<String>>();
-    Ok(format!("{} has {} videos", folder, videos.len()))
+    let latest_string = match videos.last() {
+        Some(video) => format!(", latest {}", video),
+        None        => format!(""),
+    };
+    Ok(format!("{} has {} videos{}", folder, videos.len(), latest_string))
 }
 
 /// Ensure that a YouTube URL actually exists and convert https://www.youtube.com/channel/*
