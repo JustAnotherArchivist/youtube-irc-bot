@@ -77,7 +77,7 @@ pub fn resolve_url(url: &str, rtd: &Rtd) -> Result<String, Error> {
     Ok(title)
 }
 
-pub fn canonical_user(url: &str) -> Result<Option<String>, Error> {
+pub fn get_youtube_user(url: &str) -> Result<Option<String>, Error> {
     eprintln!("RESOLVE {}", url);
 
     let client = Client::builder()
@@ -94,24 +94,10 @@ pub fn canonical_user(url: &str) -> Result<Option<String>, Error> {
     let content_type = resp.headers().get(CONTENT_TYPE)
         .and_then(|typ| typ.to_str().ok())
         .and_then(|typ| typ.parse::<Mime>().ok());
-    let len = resp.headers().get(CONTENT_LENGTH)
-        .and_then(|len| len.to_str().ok())
-        .and_then(|len| len.parse().ok())
-        .unwrap_or(0);
-    let size = len.file_size(options::CONVENTIONAL).unwrap_or_default();
-
-    // calculate download size based on the response's MIME type
-    let bytes = content_type.clone()
-        .and_then(|ct| {
-            match (ct.type_(), ct.subtype()) {
-                (IMAGE, _) => Some(10 * 1024 * 1024), // 10MB
-                _ => None
-            }})
-        .unwrap_or(DL_BYTES);
 
     // download body
     let mut body = Vec::new();
-    resp.take(bytes).read_to_end(&mut body)?;
+    resp.take(10 * 1024 * 1024).read_to_end(&mut body)?;
     let contents = String::from_utf8_lossy(&body);
 
     // get title or metadata
@@ -124,6 +110,7 @@ pub fn canonical_user(url: &str) -> Result<Option<String>, Error> {
             }
         }
     };
+    eprintln!("URL {} mentions user {:?}", url, user);
     Ok(user.clone())
 }
 
@@ -173,7 +160,7 @@ fn parse_title(page_contents: &str) -> Option<String> {
 
 fn parse_user(page_contents: &str) -> Option<String> {
     lazy_static! {
-        static ref RE: Regex = Regex::new(r#"<link itemprop="url" href="http://www.youtube.com/user/[^"]+">"#).unwrap();
+        static ref RE: Regex = Regex::new(r#"<link itemprop="url" href="http://www.youtube.com/user/([^"]+)">"#).unwrap();
     }
     let user = RE.captures(page_contents)?.get(1)?.as_str();
     Some(user.to_string())

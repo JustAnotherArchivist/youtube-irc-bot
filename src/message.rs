@@ -7,16 +7,15 @@ use std::process;
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 use unicode_segmentation::UnicodeSegmentation;
-use reqwest::Url;
 use regex::Regex;
 use itertools::Itertools;
 
-use super::http::{resolve_url, canonical_user};
-use super::sqlite::{Database, NewLogEntry};
+use super::http::get_youtube_user;
+use super::sqlite::Database;
 use super::config::Rtd;
 
 pub fn handle_message(
-    client: &IrcClient, message: &Message, rtd: &Rtd, db: &Database
+    client: &IrcClient, message: &Message, rtd: &Rtd, _db: &Database
 ) {
     // print the message if debug flag is set
     if rtd.args.flag_debug {
@@ -24,101 +23,12 @@ pub fn handle_message(
     }
 
     // match on message type
-    let (target, msg) = match message.command {
+    let (_target, msg) = match message.command {
         Command::PRIVMSG(ref target, ref msg) => (target, msg),
         _ => return,
     };
 
-    let user = message.source_nickname().unwrap();
-    let mut num_processed = 0;
-
-    // look at each space-separated message token
-    for token in msg.split_whitespace() {
-        // limit the number of processed URLs
-        if num_processed == rtd.conf.params.url_limit {
-            break;
-        }
-
-        // the token must be a valid url
-        let url = match token.parse::<Url>() {
-            Ok(url) => url,
-            _ => continue,
-        };
-
-        // the token must not contain unsafe characters
-        if contains_unsafe_chars(token) {
-            continue;
-        }
-
-        // the schema must be http or https
-        if !["http", "https"].contains(&url.scheme()) {
-            continue;
-        }
-
-        // try to get the title from the url
-        let title = match resolve_url(token, rtd) {
-            Ok(title) => title,
-            Err(err) => {
-                println!("ERROR {:?}", err);
-                continue
-            },
-        };
-
-        // create a log entry struct
-        let entry = NewLogEntry {
-            title: &title,
-            url: token,
-            user,
-            channel: target,
-        };
-
-        // check for pre-post
-        let mut msg = match if rtd.history {
-            db.check_prepost(token)
-        } else {
-            Ok(None)
-        } {
-            Ok(Some(previous_post)) => {
-                let user = if rtd.conf.features.mask_highlights {
-                    create_non_highlighting_name(&previous_post.user)
-                } else {
-                    previous_post.user
-                };
-                format!("⤷ {} → {} {} ({})",
-                    title,
-                    previous_post.time_created,
-                    user,
-                    previous_post.channel
-                )
-            },
-            Ok(None) => {
-                // add new log entry to database
-                if rtd.history {
-                    if let Err(err) = db.add_log(&entry) {
-                        eprintln!("SQL error: {}", err);
-                    }
-                }
-                format!("⤷ {}", title)
-            },
-            Err(err) => {
-                eprintln!("SQL error: {}", err);
-                continue
-            },
-        };
-
-        // limit response length, see RFC1459
-        msg = utf8_truncate(&msg, 510);
-
-        // send the IRC response
-        let target = message.response_target().unwrap_or(target);
-        if rtd.conf.features.send_notice {
-            client.send_notice(target, &msg).unwrap()
-        } else {
-            client.send_privmsg(target, &msg).unwrap()
-        }
-
-        num_processed += 1;
-    };
+    let _user = message.source_nickname().unwrap();
 
     let command_channel = &rtd.conf.params.command_channel;
     if message.response_target() == Some(command_channel) {
@@ -200,20 +110,21 @@ fn get_query(url: &str) -> Result<String, Box<error::Error>> {
 /// Ensure that a YouTube URL actually exists and convert https://www.youtube.com/channel/*
 /// to https://www.youtube.com/user/* when possible.
 fn get_canonical_url(url: &str) -> Result<String, Box<error::Error>> {
-    let canonical_url: String = match url {
+    let parsed_url = url::Url::parse(url).unwrap();
+    let canonical_url: String = match parsed_url.path() {
         "/playlist" => {
             // TODO: validate playlist URLs
             url.to_string()
         },
         p if p.starts_with("/user/") => {
-            let user = canonical_user(url)?;
+            let user = get_youtube_user(url)?;
             match user {
                 Some(user) => format!("https://www.youtube.com/user/{}/videos", user),
                 _ => return Err(MyError::new(format!("Canonical URL for {} does not have a /user/", url)).into())
             }
         },
         p if p.starts_with("/channel/") => {
-            let user = canonical_user(url)?;
+            let user = get_youtube_user(url)?;
             match user {
                 Some(user) => format!("https://www.youtube.com/user/{}/videos", user),
                 // TODO: validate channel URLs
@@ -226,10 +137,10 @@ fn get_canonical_url(url: &str) -> Result<String, Box<error::Error>> {
 }
 
 fn folder_for_url(url: &str) -> Option<String> {
-    let url = url::Url::parse(url).unwrap();
-    let folder: Option<String> = match url.path() {
+    let parsed_url = url::Url::parse(url).unwrap();
+    let folder: Option<String> = match parsed_url.path() {
         "/playlist" => {
-            let keys: HashMap<_, _> = url.query_pairs().into_owned().collect();
+            let keys: HashMap<_, _> = parsed_url.query_pairs().into_owned().collect();
             if let Some(playlist) = keys.get("playlist") {
                 Some(playlist.clone())
             } else {
