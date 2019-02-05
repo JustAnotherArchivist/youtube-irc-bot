@@ -130,7 +130,7 @@ pub fn handle_message(
                 client.send_privmsg(command_channel, get_status()).unwrap()
             },
             msg if msg.starts_with("!q ") => {
-                let url = msg.splitn(1, ' ').last().unwrap();
+                let url = msg.splitn(2, ' ').last().unwrap();
                 match get_query(&url) {
                     Ok(reply) => client.send_privmsg(command_channel, reply).unwrap(),
                     Err(err)  => client.send_privmsg(command_channel, format!("Internal error: {:?}", err)).unwrap()
@@ -171,7 +171,7 @@ impl error::Error for MyError {
 
 fn get_query(url: &str) -> Result<String, Box<error::Error>> {
     if !url.starts_with("https://www.youtube.com/") {
-        return Err(MyError::new("URL must start with https://www.youtube.com/".to_owned()).into());
+        return Err(MyError::new(format!("URL must start with https://www.youtube.com/, was {}", url)).into());
     }
     if url.starts_with("https://www.youtube.com/watch?") {
         return Err(MyError::new("!q on /watch? URL not yet implemented".to_owned()).into());
