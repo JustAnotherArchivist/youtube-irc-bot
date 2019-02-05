@@ -14,6 +14,8 @@ use super::http::get_youtube_user;
 use super::sqlite::Database;
 use super::config::Rtd;
 
+static MAX_DOWNLOADERS: usize = 27;
+
 pub fn handle_message(
     client: &IrcClient, message: &Message, rtd: &Rtd, _db: &Database
 ) {
@@ -37,11 +39,20 @@ pub fn handle_message(
                 client.send_privmsg(command_channel, get_help()).unwrap()
             },
             "!status" => {
-                client.send_privmsg(command_channel, get_status()).unwrap()
+                for message in get_status() {
+                    client.send_privmsg(command_channel, message).unwrap()
+                }
             },
             msg if msg.starts_with("!q ") => {
                 let url = msg.splitn(2, ' ').last().unwrap();
                 match get_query(&url) {
+                    Ok(reply) => client.send_privmsg(command_channel, format!("{}: {}", user, reply)).unwrap(),
+                    Err(err)  => client.send_privmsg(command_channel, format!("{}: error: {}", user, err)).unwrap()
+                }
+            },
+            msg if msg.starts_with("!a ") => {
+                let url = msg.splitn(2, ' ').last().unwrap();
+                match do_archive(&url) {
                     Ok(reply) => client.send_privmsg(command_channel, format!("{}: {}", user, reply)).unwrap(),
                     Err(err)  => client.send_privmsg(command_channel, format!("{}: error: {}", user, err)).unwrap()
                 }
@@ -79,6 +90,47 @@ impl error::Error for MyError {
     }
 }
 
+fn do_archive(url: &str) -> Result<String, Box<error::Error>> {
+    if !url.starts_with("https://www.youtube.com/") {
+        return Err(MyError::new(format!("URL must start with https://www.youtube.com/, was {}", url)).into());
+    }
+    if url.starts_with("https://www.youtube.com/watch?") {
+        return Err(MyError::new("!q on /watch? URL not yet implemented".to_owned()).into());
+    }
+    let canonical_url = get_canonical_url(url)?;
+    let folder = match folder_for_url(&canonical_url) {
+        Some(f) => f,
+        None => return Err(MyError::new(format!("Could not get folder for URL {}", canonical_url)).into()),
+    };
+    make_folder(&folder)?;
+    let sessions = get_downloader_sessions()?;
+    if let Some(session) = sessions.iter().find(|session| session.identifier == folder) {
+        return Ok(format!("Already archiving {} now", &folder));
+    }
+    if sessions.len() >= MAX_DOWNLOADERS {
+        return Ok(format!("Created folder {} but too many downloaders ({}) are running, try !a again later", &folder, MAX_DOWNLOADERS));
+    }
+    let limit = 999999;
+    let output = process::Command::new("grab-youtube-channel")
+        .arg(&folder).arg(limit.to_string())
+        .output()?;
+    let stdout_utf8 = str::from_utf8(&output.stdout)?;
+    Ok(format!("Grabbing {} (up to {} videos), note this may take 12+ hours to start when out of quota", &folder, limit))
+}
+
+fn make_folder(folder: &str) -> Result<(), Box<error::Error>> {
+    let output = process::Command::new("timeout")
+        .arg("-k").arg("2m").arg("1m")
+        .arg("ts").arg("mkdir").arg("-n").arg("YouTube").arg(folder)
+        .output()?;
+    let stdout_utf8 = str::from_utf8(&output.stdout)?;
+    if stdout_utf8 != "" {
+        Err(MyError::new(format!("Unexpected stdout from ts mkdir: {}", stdout_utf8)).into())
+    } else {
+        Ok(())
+    }
+}
+
 fn get_query(url: &str) -> Result<String, Box<error::Error>> {
     if !url.starts_with("https://www.youtube.com/") {
         return Err(MyError::new(format!("URL must start with https://www.youtube.com/, was {}", url)).into());
@@ -98,9 +150,11 @@ fn get_query(url: &str) -> Result<String, Box<error::Error>> {
     let videos = listing
         .into_iter()
         .filter(|s: &String| {
-            match s.rsplitn(1, '.').collect::<Vec<&str>>().last() {
-                Some(&ext) => ext == "mp4" || ext == "webm" || ext == "flv" || ext == "mkv" || ext == "video",
-                None       => false,
+            match s.rsplitn(2, '.').collect::<Vec<&str>>().first() {
+                Some(&ext) => {
+                    ext == "mp4" || ext == "webm" || ext == "flv" || ext == "mkv" || ext == "video"
+                },
+                None => false,
             }
         })
         .collect::<Vec<String>>();
@@ -108,7 +162,7 @@ fn get_query(url: &str) -> Result<String, Box<error::Error>> {
         Some(video) => format!(", latest {}", video),
         None        => format!(""),
     };
-    Ok(format!("{} has {} videos{}", folder, videos.len(), latest_string))
+    Ok(format!("stash has {} videos for {}{}", videos.len(), &folder, latest_string))
 }
 
 /// Ensure that a YouTube URL actually exists and convert https://www.youtube.com/channel/*
@@ -197,15 +251,26 @@ struct DownloaderSession {
     start_time: u64,
 }
 
-fn get_status() -> String {
+fn get_status() -> Vec<String> {
     match get_downloader_sessions() {
-        Err(e) => format!("{:?}", e),
+        Err(e) => vec![format!("{:?}", e)],
         Ok(mut sessions) => {
             sessions.sort_by_key(|session| session.start_time);
             sessions.reverse();
-            sessions.iter().map(|session| {
-                format!("{} ({})", session.identifier, shorthand_duration(session.start_time))
-            }).join(", ")
+            let mut messages: Vec<String> = Vec::new();
+            let mut last_message = format!("{}/{} downloaders: ", sessions.len(), MAX_DOWNLOADERS);
+            for session in sessions {
+                let part = format!("{} ({}), ", session.identifier, shorthand_duration(session.start_time));
+                if last_message.len() + part.len() >= 430 {
+                    messages.push(last_message);
+                    last_message = String::new();
+                }
+                last_message.push_str(&part);
+            }
+            if last_message != "" {
+               messages.push(last_message);
+            }
+            messages
         }
     }
 }
@@ -254,7 +319,7 @@ fn get_downloader_sessions() -> Result<Vec<DownloaderSession>, Box<error::Error>
                 let start_time   = parts.get(0).unwrap().parse::<u64>().unwrap();
                 let session_name = parts.get(1).unwrap();
                 if session_name.starts_with("YouTube-") {
-                    let identifier   = session_name.replacen("YouTube-", "", 1);
+                    let identifier = session_name.replacen("YouTube-", "", 1);
                     Some(DownloaderSession { identifier, start_time })
                 } else {
                     None
