@@ -160,7 +160,7 @@ fn get_query(url: &str) -> Result<String, Box<error::Error>> {
         })
         .collect::<Vec<String>>();
     let latest_string = match videos.last() {
-        Some(video) => format!(", latest {}", video),
+        Some(video) => format!(", latest {:?}", video),
         None        => format!(""),
     };
     Ok(format!("stash has {} videos for {}{}", videos.len(), &folder, latest_string))
