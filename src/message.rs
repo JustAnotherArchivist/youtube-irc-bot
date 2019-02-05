@@ -4,13 +4,14 @@ use std::iter;
 use std::str;
 use std::error;
 use std::process;
+use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 use unicode_segmentation::UnicodeSegmentation;
 use reqwest::Url;
 use regex::Regex;
 use itertools::Itertools;
 
-use super::http::resolve_url;
+use super::http::{resolve_url, canonical_user};
 use super::sqlite::{Database, NewLogEntry};
 use super::config::Rtd;
 
@@ -130,26 +131,58 @@ pub fn handle_message(
             },
             msg if msg.starts_with("!q ") => {
                 let url = msg.splitn(1, ' ').last().unwrap();
-                client.send_privmsg(command_channel, get_query(&url)).unwrap()
+                match get_query(&url) {
+                    Ok(reply) => client.send_privmsg(command_channel, reply).unwrap(),
+                    Err(err)  => client.send_privmsg(command_channel, format!("Internal error: {:?}", err)).unwrap()
+                }
             },
             _other => {},
         }
     }
 }
 
-fn get_query(url: &str) -> String {
+#[derive(Debug, Clone)]
+struct MyError {
+    message: String
+}
+
+impl MyError {
+    pub fn new(message: String) -> MyError {
+        MyError { message }
+    }
+}
+
+impl fmt::Display for MyError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl error::Error for MyError {
+    fn description(&self) -> &str {
+        &self.message
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        // Generic error, underlying cause isn't tracked.
+        None
+    }
+}
+
+fn get_query(url: &str) -> Result<String, Box<error::Error>> {
     if !url.starts_with("https://www.youtube.com/") {
-        return "URL must start with https://www.youtube.com/".into();
+        return Err(MyError::new("URL must start with https://www.youtube.com/".to_owned()).into());
     }
     if url.starts_with("https://www.youtube.com/watch?") {
-        return "!q on /watch? URL not yet implemented".into();
+        return Err(MyError::new("!q on /watch? URL not yet implemented".to_owned()).into());
     }
-    let folder = match folder_for_url(url) {
+    let canonical_url = get_canonical_url(url)?;
+    let folder = match folder_for_url(&canonical_url) {
         Some(f) => f,
-        None => return format!("Could not get folder for URL {}", url),
+        None => return Err(MyError::new(format!("Could not get folder for URL {}", canonical_url)).into()),
     };
     let listing = match get_file_listing(&folder) {
-        Err(e) => return format!("Internal error listing files for {}: {}", url, e),
+        Err(e) => return Err(MyError::new(format!("Internal error listing files for {}: {}", canonical_url, e)).into()),
         Ok(files) => files,
     };
     let videos = listing
@@ -161,14 +194,35 @@ fn get_query(url: &str) -> String {
             }
         })
         .collect::<Vec<String>>();
-    format!("{} has {} videos", folder, videos.len())
+    Ok(format!("{} has {} videos", folder, videos.len()))
 }
 
-/// For https://www.youtube.com/channel/*, return https://www.youtube.com/user/ if exists,
-/// otherwise keep URL as-is
-fn canonicalize_url(url: &str) -> String {
-    // TODO!!
-    "".into()
+/// Ensure that a YouTube URL actually exists and convert https://www.youtube.com/channel/*
+/// to https://www.youtube.com/user/* when possible.
+fn get_canonical_url(url: &str) -> Result<String, Box<error::Error>> {
+    let canonical_url: String = match url {
+        "/playlist" => {
+            // TODO: validate playlist URLs
+            url.to_string()
+        },
+        p if p.starts_with("/user/") => {
+            let user = canonical_user(url)?;
+            match user {
+                Some(user) => format!("https://www.youtube.com/user/{}/videos", user),
+                _ => return Err(MyError::new(format!("Canonical URL for {} does not have a /user/", url)).into())
+            }
+        },
+        p if p.starts_with("/channel/") => {
+            let user = canonical_user(url)?;
+            match user {
+                Some(user) => format!("https://www.youtube.com/user/{}/videos", user),
+                // TODO: validate channel URLs
+                _ => url.to_string()
+            }
+        },
+        other => other.to_string()
+    };
+    Ok(canonical_url)
 }
 
 fn folder_for_url(url: &str) -> Option<String> {
@@ -364,5 +418,57 @@ mod tests {
         assert_eq!(folder_for_url("https://www.youtube.com/user/jblow888/videos"), "jblow888");
         assert_eq!(folder_for_url("https://www.youtube.com/playlist?list=PL5AC656794EE191C1"), "PL5AC656794EE191C1");
         assert_eq!(folder_for_url("https://www.youtube.com/playlist?list=PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF"), "PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF");
+    }
+
+    #[test]
+    fn test_get_canonical_url() {
+        // Playlist is playlist if it exists
+        assert_eq!(
+            get_canonical_url("https://www.youtube.com/playlist?list=PL5AC656794EE191C1").unwrap(),
+            Some("https://www.youtube.com/playlist?list=PL5AC656794EE191C1")
+        );
+        assert_eq!(
+            get_canonical_url("https://www.youtube.com/playlist?list=PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF").unwrap(),
+            Some("https://www.youtube.com/playlist?list=PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF")
+        );
+        // Playlist is None if it doesn't exist
+        assert_eq!(
+            get_canonical_url("https://www.youtube.com/playlist?list=PL78L-9twndz8fMRU3NpiWSmB5IucqWuTa").unwrap(),
+            None
+        );
+        // User is user if it exists
+        assert_eq!(
+            get_canonical_url("https://www.youtube.com/user/jblow888/videos").unwrap(),
+            Some("https://www.youtube.com/user/jblow888/videos")
+        );
+        // User is always converted to canonical case
+        assert_eq!(
+            get_canonical_url("https://www.youtube.com/user/JBlow888/videos").unwrap(),
+            Some("https://www.youtube.com/user/jblow888/videos")
+        );
+        assert_eq!(
+            get_canonical_url("https://www.youtube.com/user/cnn/videos").unwrap(),
+            Some("https://www.youtube.com/user/CNN/videos")
+        );
+        // User is None if it doesn't exist
+        assert_eq!(
+            get_canonical_url("https://www.youtube.com/user/jblow8888/videos").unwrap(),
+            None
+        );
+        // Channel is channel if it exists and has no username
+        assert_eq!(
+            get_canonical_url("https://www.youtube.com/channel/UChBBWt5H8uZW1LSOh_aPt2Q/videos").unwrap(),
+            Some("https://www.youtube.com/channel/UChBBWt5H8uZW1LSOh_aPt2Q/videos")
+        );
+        // Channel is user if it exists and has a username
+        assert_eq!(
+            get_canonical_url("https://www.youtube.com/channel/UCupvZG-5ko_eiXAupbDfxWw").unwrap(),
+            Some("https://www.youtube.com/user/CNN/videos")
+        );
+        // Channel is None if it doesn't exist
+        assert_eq!(
+            get_canonical_url("https://www.youtube.com/channel/UChBBWt5H8uZW1LSOh_aPt2a/videos").unwrap(),
+            None
+        );
     }
 }
