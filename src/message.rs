@@ -121,15 +121,100 @@ pub fn handle_message(
     let command_channel = &rtd.conf.params.command_channel;
     if message.response_target() == Some(command_channel) {
         match msg.as_ref() {
-            "!help"   => client.send_privmsg(command_channel, get_help()).unwrap(),
-            "!status" => client.send_privmsg(command_channel, get_status()).unwrap(),
-            _other    => {},
+            "!help" => {
+                client.send_privmsg(command_channel, get_help()).unwrap()
+            },
+            "!status" => {
+                client.send_privmsg(command_channel, get_status()).unwrap()
+            },
+            msg if msg.starts_with("!q ") => {
+                let url= msg.splitn(1, ' ').collect::<Vec<&str>>().get(1).unwrap();
+                client.send_privmsg(command_channel, get_query(&url)).unwrap()
+            },
+            _other => {},
         }
     }
 }
 
+fn get_query(url: &str) -> String {
+    if !url.starts_with("https://www.youtube.com/") {
+        return "URL must start with https://www.youtube.com/".into();
+    }
+    if url.starts_with("https://www.youtube.com/watch?") {
+        return "!q on /watch? URL not yet implemented".into();
+    }
+    let folder = match folder_for_url(url) {
+        Some(f) => f,
+        None => return format!("Could not get folder for URL {}", url),
+    };
+    let videos =
+        get_file_listing(&folder)
+            .iter()
+            .filter(|s: &str| {
+                match s.rsplitn(1, '.').collect::<Vec<&str>>().last() {
+                    Some(&ext) => ext == "mp4" || ext == "webm" || ext == "flv" || ext == "mkv" || ext == "video",
+                    None       => false,
+                }
+            })
+            .collect();
+    format!("{} has {} videos", folder, videos.len())
+}
+
+/// For https://www.youtube.com/channel/*, return https://www.youtube.com/user/ if exists,
+/// otherwise keep URL as-is
+fn canonicalize_url(url: &str) -> String {
+    // TODO!!
+    "".into()
+}
+
+fn folder_for_url(url: &str) -> Option<&str> {
+    let url = url::Url::parse(url).unwrap();
+    let folder: Option<&str> = match url.path() {
+        "/playlist" => {
+            if let Some((_, pl)) = url.query_pairs().find(|&(ref key, _)| key == "playlist") {
+                Some(&pl)
+            } else {
+                None
+            }
+        },
+        p if p.starts_with("/user/") => {
+            if let Some(user) = p.splitn(4, '/').collect::<Vec<&str>>().get(2) {
+                Some(user)
+            } else {
+                None
+            }
+        },
+        p if p.starts_with("/channel/") => {
+            if let Some(channel) = p.splitn(4, '/').collect::<Vec<&str>>().get(2) {
+                Some(channel)
+            } else {
+                None
+            }
+        },
+        _p => None
+    };
+    let re = regex::Regex::new(r"\A[-_A-Za-z0-9]+\z").unwrap();
+    match folder {
+        Some(f) if re.is_match(f) => Some(f),
+        _ => None
+    }
+}
+
+fn get_file_listing(folder: &str) -> Result<Vec<String>, Box<error::Error>> {
+    let output = process::Command::new("ts")
+        .arg("ls")
+        .arg("-n")
+        .arg("YouTube")
+        .arg("-j")
+        .arg("-rt")
+        .arg(folder)
+        .output()?;
+    let stdout_utf8 = str::from_utf8(&output.stdout)?;
+    Ok(stdout_utf8.lines().map(String::from).collect())
+}
+
 fn get_help() -> String {
-    "!help | !status | !a <user or channel or playlist or /watch URL>".into()
+    "Usage: !help | !status | !a <user or channel or playlist or /watch URL> | !q <user or channel or playlist or /watch URL>".into()
 }
 
 #[derive(Debug)]
@@ -266,5 +351,13 @@ mod tests {
             assert_eq!(contains_unsafe_chars(&format!("http://z/{}", c)), true);
         }
         assert_eq!(contains_unsafe_chars("http://z.zzz/"), false);
+    }
+
+    #[test]
+    fn test_folder_for_url() {
+        assert_eq!(folder_for_url("https://www.youtube.com/channel/UChBBWt5H8uZW1LSOh_aPt2Q/videos"), "UChBBWt5H8uZW1LSOh_aPt2Q");
+        assert_eq!(folder_for_url("https://www.youtube.com/user/jblow888/videos"), "jblow888");
+        assert_eq!(folder_for_url("https://www.youtube.com/playlist?list=PL5AC656794EE191C1"), "PL5AC656794EE191C1");
+        assert_eq!(folder_for_url("https://www.youtube.com/playlist?list=PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF"), "PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF");
     }
 }

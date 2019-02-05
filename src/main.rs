@@ -26,6 +26,7 @@ extern crate humansize;
 extern crate unicode_segmentation;
 extern crate toml;
 extern crate directories;
+extern crate url;
 
 mod sqlite;
 mod http;
