@@ -95,7 +95,7 @@ fn do_archive(url: &str) -> Result<String, Box<error::Error>> {
         return Err(MyError::new(format!("URL must start with https://www.youtube.com/, was {}", url)).into());
     }
     if url.starts_with("https://www.youtube.com/watch?") {
-        return Err(MyError::new("!q on /watch? URL not yet implemented".to_owned()).into());
+        return Err(MyError::new("!a on /watch? URL not yet implemented".to_owned()).into());
     }
     let canonical_url = get_canonical_url(url)?;
     let folder = match folder_for_url(&canonical_url) {
