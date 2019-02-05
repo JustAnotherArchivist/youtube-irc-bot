@@ -104,6 +104,7 @@ fn do_archive(url: &str) -> Result<String, Box<error::Error>> {
     };
     make_folder(&folder)?;
     let sessions = get_downloader_sessions()?;
+    // This isn't a necessary safety check, just less confusing to the IRC user.
     if let Some(session) = sessions.iter().find(|session| session.identifier == folder) {
         return Ok(format!("Already archiving {} now", &folder));
     }
