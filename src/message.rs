@@ -42,9 +42,9 @@ pub fn handle_message(
                     client.send_privmsg(command_channel, message).unwrap()
                 }
             },
-            msg if msg.starts_with("!q ") => {
+            msg if msg.starts_with("!s ") || msg.starts_with("!q ") => {
                 let url = msg.splitn(2, ' ').last().unwrap();
-                match get_query(&url) {
+                match do_stash_check(&url) {
                     Ok(reply) => client.send_privmsg(command_channel, format!("{}: {}", user, reply)).unwrap(),
                     Err(err)  => client.send_privmsg(command_channel, format!("{}: error: {}", user, err)).unwrap()
                 }
@@ -131,7 +131,7 @@ fn make_folder(folder: &str) -> Result<(), Box<error::Error>> {
     }
 }
 
-fn get_query(url: &str) -> Result<String, Box<error::Error>> {
+fn do_stash_check(url: &str) -> Result<String, Box<error::Error>> {
     if !url.starts_with("https://www.youtube.com/") {
         return Err(MyError::new(format!("URL must start with https://www.youtube.com/, was {}", url)).into());
     }
@@ -234,7 +234,7 @@ fn get_file_listing(folder: &str) -> Result<Vec<String>, Box<error::Error>> {
 }
 
 fn get_help() -> String {
-    "Usage: !help | !status | !a <user or channel URL> | !q <user or channel URL>".into()
+    "Usage: !help | !status | !a <user or channel URL> | !s <user or channel URL>".into()
 }
 
 #[derive(Debug)]
