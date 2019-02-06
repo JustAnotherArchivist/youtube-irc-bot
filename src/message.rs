@@ -115,7 +115,7 @@ fn do_archive(url: &str) -> Result<String, Box<error::Error>> {
         .arg(&folder).arg(limit.to_string())
         .output()?;
     let stdout_utf8 = str::from_utf8(&output.stdout)?;
-    Ok(format!("Grabbing {} (up to {} videos), note this may take 12+ hours to start when out of quota", &folder, limit))
+    Ok(format!("Grabbing {}", &folder))
 }
 
 fn make_folder(folder: &str) -> Result<(), Box<error::Error>> {
