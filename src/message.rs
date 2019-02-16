@@ -13,7 +13,7 @@ use super::http::get_youtube_user;
 use super::sqlite::Database;
 use super::config::Rtd;
 
-static MAX_DOWNLOADERS: usize = 27;
+static MAX_DOWNLOADERS: usize = 30;
 
 pub fn handle_message(
     client: &IrcClient, message: &Message, rtd: &Rtd, _db: &Database
