@@ -1,22 +1,18 @@
 use irc::client::prelude::*;
 use std::collections::HashMap;
-use std::iter;
 use std::str;
 use std::error;
 use std::process;
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
-use unicode_segmentation::UnicodeSegmentation;
-use regex::Regex;
 
 use super::http::get_youtube_user;
-use super::sqlite::Database;
 use super::config::Rtd;
 
 static MAX_DOWNLOADERS: usize = 30;
 
 pub fn handle_message(
-    client: &IrcClient, message: &Message, rtd: &Rtd, _db: &Database
+    client: &IrcClient, message: &Message, rtd: &Rtd
 ) {
     // print the message if debug flag is set
     if rtd.args.flag_debug {
@@ -104,17 +100,17 @@ fn do_archive(url: &str) -> Result<String, Box<error::Error>> {
     make_folder(&folder)?;
     let sessions = get_downloader_sessions()?;
     // This isn't a necessary safety check, just less confusing to the IRC user.
-    if let Some(session) = sessions.iter().find(|session| session.identifier == folder) {
+    if let Some(_session) = sessions.iter().find(|session| session.identifier == folder) {
         return Ok(format!("Already archiving {} now", &folder));
     }
     if sessions.len() >= MAX_DOWNLOADERS {
-        return Ok(format!("Created folder {} but too many downloaders ({}) are running, try !a again later", &folder, MAX_DOWNLOADERS));
+        return Ok(format!("Created folder {} but too many downloaders (>= {}) are running, try !a again later", &folder, MAX_DOWNLOADERS));
     }
     let limit = 999999;
     let output = process::Command::new("grab-youtube-channel")
         .arg(&folder).arg(limit.to_string())
         .output()?;
-    let stdout_utf8 = str::from_utf8(&output.stdout)?;
+    let _stdout_utf8 = str::from_utf8(&output.stdout)?;
     Ok(format!("Grabbing {}", &folder))
 }
 
@@ -320,69 +316,9 @@ fn get_downloader_sessions() -> Result<Vec<DownloaderSession>, Box<error::Error>
     Ok(sessions)
 }
 
-// regex for unsafe characters, as defined in RFC 1738
-const RE_UNSAFE_CHARS: &str = r"[{}|\\^~\[\]`]";
-
-fn contains_unsafe_chars(token: &str) -> bool {
-    lazy_static! {
-        static ref UNSAFE: Regex = Regex::new(RE_UNSAFE_CHARS).unwrap();
-    }
-    UNSAFE.is_match(token)
-}
-
-fn create_non_highlighting_name(name: &str) -> String {
-    let mut graphemes = name.graphemes(true);
-    let first = graphemes.next();
-
-    first
-        .into_iter()
-        .chain(iter::once("\u{200C}"))
-        .chain(graphemes)
-        .collect()
-}
-
-// truncate to a maximum number of bytes, taking UTF-8 into account
-fn utf8_truncate(s: &str, n: usize) -> String {
-    s.char_indices()
-        .take_while(|(len, c)| len + c.len_utf8() <= n)
-        .map(|(_, c)| c)
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_utf8_truncate() {
-        assert_eq!("",                 utf8_truncate("", 10));
-        assert_eq!("",                 utf8_truncate("", 1));
-        assert_eq!(" ",                utf8_truncate("  ", 1));
-        assert_eq!("\u{2665}",         utf8_truncate("\u{2665}", 4));
-        assert_eq!("\u{2665}",         utf8_truncate("\u{2665}", 3));
-        assert_eq!("",                 utf8_truncate("\u{2665}", 2));
-        assert_eq!("\u{0306}\u{0306}", utf8_truncate("\u{0306}\u{0306}", 4));
-        assert_eq!("\u{0306}",         utf8_truncate("\u{0306}\u{0306}", 2));
-        assert_eq!("\u{0306}",         utf8_truncate("\u{0306}", 2));
-        assert_eq!("",                 utf8_truncate("\u{0306}", 1));
-        assert_eq!("hello ",           utf8_truncate("hello \u{1F603} world!", 9));
-    }
-
-    #[test]
-    fn test_create_non_highlighting_name() {
-        assert_eq!("\u{200C}",    create_non_highlighting_name(""));
-        assert_eq!("f\u{200C}oo", create_non_highlighting_name("foo"));
-        assert_eq!("b\u{200C}ar", create_non_highlighting_name("bar"));
-        assert_eq!("b\u{200C}az", create_non_highlighting_name("baz"));
-    }
-
-    #[test]
-    fn test_contains_unsafe_chars() {
-        for c in &['{', '}', '|', '\\', '^', '~', '[', ']', '`'] {
-            assert_eq!(contains_unsafe_chars(&format!("http://z/{}", c)), true);
-        }
-        assert_eq!(contains_unsafe_chars("http://z.zzz/"), false);
-    }
 
     #[test]
     fn test_folder_for_url() {

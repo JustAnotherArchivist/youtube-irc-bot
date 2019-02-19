@@ -13,7 +13,6 @@ use std::fmt;
 use directories::{ProjectDirs, BaseDirs};
 
 use super::Args;
-use super::buildinfo;
 
 // serde structures defining the configuration file structure
 #[derive(Serialize, Deserialize)]
@@ -22,7 +21,6 @@ pub struct Conf {
     pub features: Features,
     #[serde(rename = "parameters")]
     pub params: Parameters,
-    pub database: Database,
     #[serde(rename = "connection")]
     pub client: IrcConfig,
 }
@@ -34,23 +32,6 @@ pub struct Features {
     pub report_mime: bool,
     pub mask_highlights: bool,
     pub send_notice: bool,
-    pub history: bool,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(default)]
-pub struct Database {
-    pub path: String,
-    #[serde(rename = "type")]
-    pub db_type: String,
-}
-impl Default for Database {
-    fn default() -> Self {
-        Self {
-            path: "".to_string(),
-            db_type: "in-memory".to_string(),
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -94,7 +75,6 @@ impl Default for Conf {
         Self {
             features: Features::default(),
             params: Parameters::default(),
-            database: Database::default(),
             client: IrcConfig {
                 nickname: Some("url-bot-rs".to_string()),
                 alt_nicks: Some(vec!["url-bot-rs_".to_string()]),
@@ -139,7 +119,6 @@ pub struct Rtd {
 #[derive(Default)]
 pub struct Paths {
     pub conf: PathBuf,
-    pub db: Option<PathBuf>,
 }
 
 impl Rtd {
@@ -176,41 +155,7 @@ impl Rtd {
         // load config file
         rtd.conf = Conf::load(&rtd.paths.conf)?;
 
-        // set database path and history flag
-        let (hist_enabled, db_path) = Self::get_db_info(&rtd, &dirs);
-        rtd.history = hist_enabled;
-        rtd.paths.db = db_path.and_then(|p| Some(expand_tilde(&p)));
-
-        // check database path exists, create it if it doesn't
-        if let Some(dp) = rtd.paths.db.clone() {
-            create_dir_if_missing(dp.parent().unwrap())?;
-        }
-
-        // set url-bot-rs version number in the irc client configuration
-        rtd.conf.client.version = Some(String::from(buildinfo::PKG_VERSION));
-
         Ok(rtd)
-    }
-
-    fn get_db_info(
-        rtd: &Rtd, dirs: &ProjectDirs
-    ) -> (bool, Option<PathBuf>) {
-        if let Some(ref path) = rtd.args.flag_db {
-            // enable history when db path given as CLI argument
-            (true, Some(PathBuf::from(path)))
-        } else if !rtd.conf.features.history {
-            // no path specified on CLI, and history disabled in configuration
-            (false, None)
-        } else if !rtd.conf.database.path.is_empty() {
-            // (non-empty) db path specified in configuration
-            (true, Some(PathBuf::from(&rtd.conf.database.path)))
-        } else if rtd.conf.database.db_type == "sqlite" {
-            // database type is sqlite, but no path given, use default
-            (true, Some(dirs.data_local_dir().join("history.db")))
-        } else {
-            // use in-memory database
-            (true, None)
-        }
     }
 }
 
@@ -224,7 +169,7 @@ macro_rules! impl_display {
         })+
     }
 }
-impl_display!(Features, Parameters, Database);
+impl_display!(Features, Parameters);
 
 fn create_dir_if_missing(dir: &Path) -> Result<bool, Error> {
     let pdir = dir.to_str().unwrap();

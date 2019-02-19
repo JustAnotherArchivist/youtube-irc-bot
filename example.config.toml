@@ -11,10 +11,6 @@ user_agent = "Mozilla/5.0"
 accept_lang = "en"
 command_channel = "#youtubearchive"
 
-[database]
-path = ""
-type = "in-memory"
-
 [connection]
 nickname = "botnick"
 nick_password = ""
