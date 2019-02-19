@@ -3,7 +3,6 @@ report_metadata = false
 report_mime = false
 mask_highlights = false
 send_notice = false
-history = false
 
 [parameters]
 url_limit = 10

@@ -112,8 +112,6 @@ pub struct Rtd {
     pub conf: Conf,
     // command-line arguments
     pub args: Args,
-    // settings derived from both CLI args and configuration file
-    pub history: bool,
 }
 
 #[derive(Default)]
