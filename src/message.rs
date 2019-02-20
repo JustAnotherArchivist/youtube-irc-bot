@@ -47,7 +47,7 @@ pub fn handle_message(
             },
             msg if msg.starts_with("!a ") => {
                 let url = msg.splitn(2, ' ').last().unwrap();
-                match do_archive(&url) {
+                match do_archive(&url, &user) {
                     Ok(reply) => client.send_privmsg(command_channel, format!("{}: {}", user, reply)).unwrap(),
                     Err(err)  => client.send_privmsg(command_channel, format!("{}: error: {}", user, err)).unwrap()
                 }
@@ -85,7 +85,7 @@ impl error::Error for MyError {
     }
 }
 
-fn do_archive(url: &str) -> Result<String, Box<error::Error>> {
+fn do_archive(url: &str, user: &str) -> Result<String, Box<error::Error>> {
     if !url.starts_with("https://www.youtube.com/") {
         return Err(MyError::new(format!("URL must start with https://www.youtube.com/, was {}", url)).into());
     }
@@ -103,8 +103,8 @@ fn do_archive(url: &str) -> Result<String, Box<error::Error>> {
     if let Some(_session) = sessions.iter().find(|session| session.identifier == folder) {
         return Ok(format!("Already archiving {} now", &folder));
     }
-    if sessions.len() >= MAX_DOWNLOADERS {
-        return Ok(format!("Created folder {} but too many downloaders (>= {}) are running, try !a again later", &folder, MAX_DOWNLOADERS));
+    if sessions.len() >= limit_for_user(user) {
+        return Ok(format!("Created folder {} but too many downloaders are running, try !a again later", &folder));
     }
     let limit = 999999;
     let output = process::Command::new("grab-youtube-channel")
@@ -112,6 +112,13 @@ fn do_archive(url: &str) -> Result<String, Box<error::Error>> {
         .output()?;
     let _stdout_utf8 = str::from_utf8(&output.stdout)?;
     Ok(format!("Grabbing {}", &folder))
+}
+
+fn limit_for_user(user: &str) -> usize {
+    match user {
+        "Flashfire" => MAX_DOWNLOADERS - 1,
+        _           => MAX_DOWNLOADERS,
+    }
 }
 
 fn make_folder(folder: &str) -> Result<(), Box<error::Error>> {
