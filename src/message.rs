@@ -52,6 +52,13 @@ pub fn handle_message(
                     Err(err)  => client.send_privmsg(command_channel, format!("{}: error: {}", user, err)).unwrap()
                 }
             },
+            msg if msg.starts_with("!abort ") => {
+                let task = msg.splitn(2, ' ').last().unwrap();
+                match do_abort(&task) {
+                    Ok(reply) => client.send_privmsg(command_channel, format!("{}: {}", user, reply)).unwrap(),
+                    Err(err)  => client.send_privmsg(command_channel, format!("{}: error: {}", user, err)).unwrap()
+                }
+            },
             _other => {},
         }
     }
@@ -112,6 +119,24 @@ fn do_archive(url: &str, user: &str) -> Result<String, Box<error::Error>> {
         .output()?;
     let _stdout_utf8 = str::from_utf8(&output.stdout)?;
     Ok(format!("Grabbing {}", &folder))
+}
+
+fn do_abort(task: &str) -> Result<String, Box<error::Error>> {
+    assert_valid_task_name(task)?;
+    let session = format!("YouTube-{}", task);
+    let _output = process::Command::new("tmux")
+        .arg("send-keys").arg("-t").arg(&session).arg("C-c")
+        .output()?;
+    Ok(format!("Aborted {}", &task))
+}
+
+fn assert_valid_task_name(task: &str) -> Result<(), Box<error::Error>> {
+    let re = regex::Regex::new(r"\A[-_A-Za-z0-9]+\z").unwrap();
+    if re.is_match(task) {
+        Ok(())
+    } else {
+        Err(MyError::new(format!("Invalid task name: {}", task)).into())
+    }
 }
 
 fn limit_for_user(user: &str) -> usize {
@@ -237,7 +262,7 @@ fn get_file_listing(folder: &str) -> Result<Vec<String>, Box<error::Error>> {
 }
 
 fn get_help() -> String {
-    "Usage: !help | !status | !a <user or channel URL> | !s <user or channel URL>".into()
+    "Usage: !help | !status | !a <user or channel URL> | !s <user or channel URL> | !abort <task>".into()
 }
 
 #[derive(Debug)]
