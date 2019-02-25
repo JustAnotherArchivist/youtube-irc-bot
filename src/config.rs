@@ -76,19 +76,19 @@ impl Default for Conf {
             features: Features::default(),
             params: Parameters::default(),
             client: IrcConfig {
-                nickname: Some("url-bot-rs".to_string()),
-                alt_nicks: Some(vec!["url-bot-rs_".to_string()]),
+                nickname: Some("youtube-irc-bot".to_string()),
+                alt_nicks: Some(vec!["youtube-irc-bot_".to_string()]),
                 nick_password: Some("".to_string()),
-                username: Some("url-bot-rs".to_string()),
-                realname: Some("url-bot-rs".to_string()),
+                username: Some("youtube-irc-bot".to_string()),
+                realname: Some("youtube-irc-bot".to_string()),
                 server: Some("chat.freenode.net".to_string()),
                 port: Some(6697),
                 password: Some("".to_string()),
                 use_ssl: Some(true),
                 encoding: Some("UTF-8".to_string()),
                 channels: Some(vec![]),
-                user_info: Some("Feed me URLs.".to_string()),
-                source: Some("https://github.com/nuxeh/url-bot-rs".to_string()),
+                user_info: Some("Helpful bot".to_string()),
+                source: Some("https://github.com/video-archivist/youtube-irc-bot".to_string()),
                 ping_time: Some(180),
                 ping_timeout: Some(10),
                 burst_window_length: Some(8),
@@ -127,7 +127,7 @@ impl Rtd {
         rtd.args = args;
 
         // get a config file path
-        let dirs = ProjectDirs::from("org", "", "url-bot-rs").unwrap();
+        let dirs = ProjectDirs::from("org", "", "youtube-irc-bot").unwrap();
         rtd.paths.conf = match rtd.args.flag_conf {
             // configuration file path specified as command line parameter
             Some(ref cp) => expand_tilde(cp),
