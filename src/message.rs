@@ -147,9 +147,12 @@ fn limit_for_user(user: &str) -> usize {
 }
 
 fn make_folder(folder: &str) -> Result<(), Box<error::Error>> {
-    let output = process::Command::new("timeout")
+    let home    = dirs::home_dir().unwrap();
+    let youtube = home.as_path().join("YouTube");
+    let output  = process::Command::new("timeout")
+        .current_dir(youtube)
         .arg("-k").arg("2m").arg("1m")
-        .arg("ts").arg("mkdir").arg("-n").arg("YouTube").arg(folder)
+        .arg("ts").arg("mkdir").arg(folder)
         .output()?;
     let stdout_utf8 = str::from_utf8(&output.stdout)?;
     if stdout_utf8 != "" {
