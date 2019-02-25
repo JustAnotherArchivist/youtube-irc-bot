@@ -1,10 +1,3 @@
-/*
- * url-bot-rs
- *
- * URL parsing IRC bot
- *
- */
-
 extern crate irc;
 extern crate docopt;
 #[macro_use]
