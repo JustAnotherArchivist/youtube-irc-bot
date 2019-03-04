@@ -19,6 +19,7 @@ extern crate url;
 mod http;
 mod config;
 mod message;
+mod error;
 
 use docopt::Docopt;
 use irc::client::prelude::*;

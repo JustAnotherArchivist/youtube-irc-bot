@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use std::str;
 use std::error;
 use std::process;
-use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::http::get_youtube_user;
+use super::http::{get_youtube_user, get_youtube_channel};
 use super::config::Rtd;
+use super::error::MyError;
 
 static MAX_DOWNLOADERS: usize = 30;
 
@@ -64,32 +64,13 @@ pub fn handle_message(
     }
 }
 
-#[derive(Debug, Clone)]
-struct MyError {
-    message: String
-}
-
-impl MyError {
-    pub fn new(message: String) -> MyError {
-        MyError { message }
-    }
-}
-
-impl fmt::Display for MyError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl error::Error for MyError {
-    fn description(&self) -> &str {
-        &self.message
-    }
-
-    fn cause(&self) -> Option<&error::Error> {
-        // Generic error, underlying cause isn't tracked.
-        None
-    }
+fn get_folder(url: &str) -> Result<String, Box<error::Error>> {
+    let canonical_url = get_canonical_url(url)?;
+    let folder = match folder_for_url(&canonical_url) {
+        Some(f) => f,
+        None => return Err(MyError::new(format!("Could not get folder for URL {}", canonical_url)).into()),
+    };
+    Ok(folder)
 }
 
 fn do_archive(url: &str, user: &str) -> Result<String, Box<error::Error>> {
@@ -97,28 +78,36 @@ fn do_archive(url: &str, user: &str) -> Result<String, Box<error::Error>> {
         return Err(MyError::new(format!("URL must start with https://www.youtube.com/, was {}", url)).into());
     }
     if url.starts_with("https://www.youtube.com/watch?") {
-        return Err(MyError::new("!a on /watch? URL not yet implemented".to_owned()).into());
+        let channel_url = format!("https://www.youtube.com/channel/{}", get_youtube_channel(url)?);
+        let folder = get_folder(&channel_url)?;
+        let sessions = get_downloader_sessions()?;
+        if let Some(_session) = sessions.iter().find(|session| session.identifier == folder) {
+            return Ok(format!("Can't archive {} because another task is running in the same folder {}", &url, &folder));
+        }
+        let output = process::Command::new("grab-youtube-video")
+            .arg(&folder).arg(url)
+            .output()?;
+        let _stdout_utf8 = str::from_utf8(&output.stdout)?;
+        Ok(format!("Grabbing {} -> folder {}", &url, &folder))
+    } else {
+        let canonical_url = get_canonical_url(url)?;
+        let folder = get_folder(&canonical_url)?;
+        make_folder(&folder)?;
+        let sessions = get_downloader_sessions()?;
+        // This isn't a necessary safety check, just less confusing to the IRC user.
+        if let Some(_session) = sessions.iter().find(|session| session.identifier == folder) {
+            return Ok(format!("Already archiving {} now", &folder));
+        }
+        if sessions.len() >= limit_for_user(user) {
+            return Ok(format!("Created folder {} but too many downloaders are running, try !a again later", &folder));
+        }
+        let limit = 999999;
+        let output = process::Command::new("grab-youtube-channel")
+            .arg(&folder).arg(limit.to_string())
+            .output()?;
+        let _stdout_utf8 = str::from_utf8(&output.stdout)?;
+        Ok(format!("Grabbing {} -> folder {}", &url, &folder))
     }
-    let canonical_url = get_canonical_url(url)?;
-    let folder = match folder_for_url(&canonical_url) {
-        Some(f) => f,
-        None => return Err(MyError::new(format!("Could not get folder for URL {}", canonical_url)).into()),
-    };
-    make_folder(&folder)?;
-    let sessions = get_downloader_sessions()?;
-    // This isn't a necessary safety check, just less confusing to the IRC user.
-    if let Some(_session) = sessions.iter().find(|session| session.identifier == folder) {
-        return Ok(format!("Already archiving {} now", &folder));
-    }
-    if sessions.len() >= limit_for_user(user) {
-        return Ok(format!("Created folder {} but too many downloaders are running, try !a again later", &folder));
-    }
-    let limit = 999999;
-    let output = process::Command::new("grab-youtube-channel")
-        .arg(&folder).arg(limit.to_string())
-        .output()?;
-    let _stdout_utf8 = str::from_utf8(&output.stdout)?;
-    Ok(format!("Grabbing {}", &folder))
 }
 
 fn do_abort(task: &str) -> Result<String, Box<error::Error>> {

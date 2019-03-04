@@ -8,9 +8,9 @@ use reqwest::header::{USER_AGENT, ACCEPT_LANGUAGE, CONTENT_TYPE};
 use std::io::Read;
 use mime::{Mime, TEXT, HTML};
 
-pub fn get_youtube_user(url: &str) -> Result<Option<String>, Error> {
-    eprintln!("RESOLVE {}", url);
+use super::error::MyError;
 
+fn contents_for_url(url: &str) -> Result<String, Error> {
     let client = Client::builder()
         .timeout(Duration::from_secs(10)) // per read/write op
         .build()?;
@@ -21,28 +21,42 @@ pub fn get_youtube_user(url: &str) -> Result<Option<String>, Error> {
         .send()?
         .error_for_status()?;
 
-    // get response headers
     let content_type = resp.headers().get(CONTENT_TYPE)
         .and_then(|typ| typ.to_str().ok())
         .and_then(|typ| typ.parse::<Mime>().ok());
 
-    // download body
-    let mut body = Vec::new();
-    resp.take(10 * 1024 * 1024).read_to_end(&mut body)?;
-    let contents = String::from_utf8_lossy(&body);
-
-    // get title or metadata
-    let user = match content_type {
-        None => parse_user(&contents),
+    match content_type {
         Some(mime) => {
             match (mime.type_(), mime.subtype()) {
-                (TEXT, HTML) => parse_user(&contents),
-                _ => None
+                (TEXT, HTML) => (),
+                mime => {
+                    return Err(MyError::new(format!("Expected text/html mime type but got {:?}", mime)).into());
+                }
             }
+        },
+        None => {
+            return Err(MyError::new("Expected text/html mime type but did not get a mime type".into()).into());
         }
     };
-    eprintln!("URL {} mentions user {:?}", url, user);
+
+    let mut body = Vec::new();
+    resp.take(10 * 1024 * 1024).read_to_end(&mut body)?;
+    Ok(String::from_utf8_lossy(&body).into())
+}
+
+pub fn get_youtube_user(url: &str) -> Result<Option<String>, Error> {
+    let contents = contents_for_url(url)?;
+    let user = parse_user(&contents);
     Ok(user.clone())
+}
+
+pub fn get_youtube_channel(url: &str) -> Result<String, Error> {
+    let contents = contents_for_url(url)?;
+    let channel = parse_channel(&contents);
+    match channel {
+        Some(channel) => Ok(channel.clone()),
+        None => return Err(MyError::new(format!("Could not find channel identifier in {}", url)).into())
+    }
 }
 
 fn parse_title(page_contents: &str) -> Option<String> {
@@ -75,3 +89,10 @@ fn parse_user(page_contents: &str) -> Option<String> {
     Some(user.to_string())
 }
 
+fn parse_channel(page_contents: &str) -> Option<String> {
+    lazy_static! {
+        static ref RE: Regex = Regex::new(r#"<meta itemprop="channelId" content="([^"]+)">"#).unwrap();
+    }
+    let channel = RE.captures(page_contents)?.get(1)?.as_str();
+    Some(channel.to_string())
+}
