@@ -38,7 +38,7 @@ pub fn handle_message(
                     client.send_privmsg(command_channel, message).unwrap()
                 }
             },
-            msg if msg.starts_with("!s ") || msg.starts_with("!q ") => {
+            msg if msg.starts_with("!s ") => {
                 let url = msg.splitn(2, ' ').last().unwrap();
                 match do_stash_check(&url) {
                     Ok(reply) => client.send_privmsg(command_channel, format!("{}: {}", user, reply)).unwrap(),
@@ -156,7 +156,7 @@ fn do_stash_check(url: &str) -> Result<String, Box<error::Error>> {
         return Err(MyError::new(format!("URL must start with https://www.youtube.com/, was {}", url)).into());
     }
     if url.starts_with("https://www.youtube.com/watch?") {
-        return Err(MyError::new("!q on /watch? URL not yet implemented".to_owned()).into());
+        return Err(MyError::new("!s on /watch? URL not yet implemented".to_owned()).into());
     }
     let canonical_url = get_canonical_url(url)?;
     let folder = match folder_for_url(&canonical_url) {
@@ -254,7 +254,7 @@ fn get_file_listing(folder: &str) -> Result<Vec<String>, Box<error::Error>> {
 }
 
 fn get_help() -> String {
-    "Usage: !help | !status | !a <user or channel URL> | !s <user or channel URL> | !abort <task>".into()
+    "Usage: !help | !status | !a <user or channel or watch URL> | !s <user or channel URL> | !abort <task>".into()
 }
 
 #[derive(Debug)]
