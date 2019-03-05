@@ -88,7 +88,7 @@ fn do_archive(url: &str, user: &str) -> Result<String, Box<error::Error>> {
             .arg(&folder).arg(url)
             .output()?;
         let _stdout_utf8 = str::from_utf8(&output.stdout)?;
-        Ok(format!("Grabbing {} -> folder {}", &url, &folder))
+        Ok(format!("Grabbing {} -> {}", &url, &folder))
     } else {
         let canonical_url = get_canonical_url(url)?;
         let folder = get_folder(&canonical_url)?;
@@ -106,7 +106,7 @@ fn do_archive(url: &str, user: &str) -> Result<String, Box<error::Error>> {
             .arg(&folder).arg(limit.to_string())
             .output()?;
         let _stdout_utf8 = str::from_utf8(&output.stdout)?;
-        Ok(format!("Grabbing {} -> folder {}", &url, &folder))
+        Ok(format!("Grabbing {} -> {}", &url, &folder))
     }
 }
 
