@@ -1,33 +1,13 @@
-extern crate irc;
-extern crate docopt;
-#[macro_use]
-extern crate serde_derive;
-extern crate itertools;
-extern crate regex;
-#[macro_use]
-extern crate lazy_static;
-extern crate htmlescape;
-extern crate time;
-extern crate reqwest;
-extern crate mime;
-extern crate humansize;
-extern crate unicode_segmentation;
-extern crate toml;
-extern crate directories;
-extern crate url;
-
-mod http;
-mod config;
-mod message;
-mod error;
+extern crate youtube_irc_bot;
 
 use docopt::Docopt;
 use irc::client::prelude::*;
 use std::process;
 use std::path::PathBuf;
 
-use self::config::Rtd;
-use self::message::handle_message;
+use youtube_irc_bot::config::Rtd;
+use youtube_irc_bot::config::Args;
+use youtube_irc_bot::message::handle_message;
 
 // docopt usage string
 const USAGE: &str = "
@@ -42,13 +22,6 @@ Options:
     -D --debug      Print debugging information.
     -c --conf=PATH  Use configuration file at PATH.
 ";
-
-#[derive(Debug, Deserialize, Default)]
-pub struct Args {
-    flag_verbose: bool,
-    flag_debug: bool,
-    flag_conf: Option<PathBuf>,
-}
 
 fn main() {
     // parse command line arguments with docopt

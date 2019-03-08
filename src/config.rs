@@ -12,7 +12,12 @@ use failure::Error;
 use std::fmt;
 use directories::{ProjectDirs, BaseDirs};
 
-use super::Args;
+#[derive(Debug, Deserialize, Default)]
+pub struct Args {
+    pub flag_verbose: bool,
+    pub flag_debug: bool,
+    pub flag_conf: Option<PathBuf>,
+}
 
 // serde structures defining the configuration file structure
 #[derive(Serialize, Deserialize)]

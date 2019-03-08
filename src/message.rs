@@ -64,7 +64,7 @@ pub fn handle_message(
     }
 }
 
-fn get_folder(url: &str) -> Result<String, Box<error::Error>> {
+pub fn get_folder(url: &str) -> Result<String, Box<error::Error>> {
     let canonical_url = get_canonical_url(url)?;
     let folder = match folder_for_url(&canonical_url) {
         Some(f) => f,
