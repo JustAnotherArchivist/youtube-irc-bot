@@ -42,14 +42,14 @@ pub struct Features {
 #[derive(Serialize, Deserialize)]
 #[serde(default)]
 pub struct Parameters {
-    pub url_limit: u8,
+    pub task_limit: usize,
     pub command_channel: String,
 }
 
 impl Default for Parameters {
     fn default() -> Self {
         Self {
-            url_limit: 10,
+            task_limit: 30,
             command_channel: "".to_string(),
         }
     }

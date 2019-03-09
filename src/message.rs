@@ -9,8 +9,6 @@ use super::http::{get_youtube_user, get_youtube_channel};
 use super::config::Rtd;
 use super::error::MyError;
 
-static MAX_DOWNLOADERS: usize = 30;
-
 pub fn handle_message(
     client: &IrcClient, message: &Message, rtd: &Rtd
 ) {
@@ -34,7 +32,7 @@ pub fn handle_message(
                 client.send_privmsg(command_channel, get_help()).unwrap()
             },
             "!status" => {
-                for message in get_status() {
+                for message in get_status(rtd) {
                     client.send_privmsg(command_channel, message).unwrap()
                 }
             },
@@ -47,7 +45,7 @@ pub fn handle_message(
             },
             msg if msg.starts_with("!a ") => {
                 let url = msg.splitn(2, ' ').last().unwrap();
-                match do_archive(&url, &user) {
+                match do_archive(&url, &user, &rtd) {
                     Ok(reply) => client.send_privmsg(command_channel, format!("{}: {}", user, reply)).unwrap(),
                     Err(err)  => client.send_privmsg(command_channel, format!("{}: error: {}", user, err)).unwrap()
                 }
@@ -73,7 +71,7 @@ pub fn get_folder(url: &str) -> Result<String, Box<error::Error>> {
     Ok(folder)
 }
 
-fn do_archive(url: &str, user: &str) -> Result<String, Box<error::Error>> {
+fn do_archive(url: &str, user: &str, rtd: &Rtd) -> Result<String, Box<error::Error>> {
     if !url.starts_with("https://www.youtube.com/") {
         return Err(MyError::new(format!("URL must start with https://www.youtube.com/, was {}", url)).into());
     }
@@ -98,7 +96,7 @@ fn do_archive(url: &str, user: &str) -> Result<String, Box<error::Error>> {
         if let Some(_session) = sessions.iter().find(|session| session.identifier == folder) {
             return Ok(format!("Already archiving {} now", &folder));
         }
-        if sessions.len() >= limit_for_user(user) {
+        if sessions.len() >= limit_for_user(user, rtd) {
             return Ok(format!("Created folder {} but too many downloaders are running, try !a again later", &folder));
         }
         let limit = 999999;
@@ -128,10 +126,10 @@ fn assert_valid_task_name(task: &str) -> Result<(), Box<error::Error>> {
     }
 }
 
-fn limit_for_user(user: &str) -> usize {
+fn limit_for_user(user: &str, rtd: &Rtd) -> usize {
     match user {
-        "Flashfire" => MAX_DOWNLOADERS - 1,
-        _           => MAX_DOWNLOADERS,
+        "Flashfire" => rtd.conf.params.task_limit - 1,
+        _           => rtd.conf.params.task_limit,
     }
 }
 
@@ -263,14 +261,14 @@ struct DownloaderSession {
     start_time: u64,
 }
 
-fn get_status() -> Vec<String> {
+fn get_status(rtd: &Rtd) -> Vec<String> {
     match get_downloader_sessions() {
         Err(e) => vec![format!("{:?}", e)],
         Ok(mut sessions) => {
             sessions.sort_by_key(|session| session.start_time);
             sessions.reverse();
             let mut messages: Vec<String> = Vec::new();
-            let mut last_message = format!("{}/{} downloaders: ", sessions.len(), MAX_DOWNLOADERS);
+            let mut last_message = format!("{}/{} downloaders: ", sessions.len(), rtd.conf.params.task_limit);
             for session in sessions {
                 let part = format!("{} ({}), ", session.identifier, shorthand_duration(session.start_time));
                 if last_message.len() + part.len() >= 430 {

@@ -5,7 +5,7 @@ mask_highlights = false
 send_notice = false
 
 [parameters]
-url_limit = 10
+task_limit = 34
 command_channel = "#youtubearchive"
 
 [connection]
