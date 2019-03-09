@@ -3,7 +3,6 @@ extern crate youtube_irc_bot;
 use docopt::Docopt;
 use irc::client::prelude::*;
 use std::process;
-use std::path::PathBuf;
 
 use youtube_irc_bot::config::Rtd;
 use youtube_irc_bot::config::Args;
