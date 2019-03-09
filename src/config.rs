@@ -43,8 +43,6 @@ pub struct Features {
 #[serde(default)]
 pub struct Parameters {
     pub url_limit: u8,
-    pub user_agent: String,
-    pub accept_lang: String,
     pub command_channel: String,
 }
 
@@ -52,8 +50,6 @@ impl Default for Parameters {
     fn default() -> Self {
         Self {
             url_limit: 10,
-            user_agent: "Mozilla/5.0".to_string(),
-            accept_lang: "en".to_string(),
             command_channel: "".to_string(),
         }
     }
