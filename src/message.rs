@@ -71,24 +71,31 @@ pub fn get_folder(url: &str) -> Result<String, Box<error::Error>> {
     Ok(folder)
 }
 
-fn do_archive(url: &str, user: &str, rtd: &Rtd) -> Result<String, Box<error::Error>> {
+fn fix_youtube_url(url: &str) -> Result<String, Box<error::Error>> {
+    let url = url.replace("https://m.youtube.com/", "https://www.youtube.com/");
+    let url = url.replace("https://youtube.com/", "https://www.youtube.com/");
     if !url.starts_with("https://www.youtube.com/") {
-        return Err(MyError::new(format!("URL must start with https://www.youtube.com/, was {}", url)).into());
+        return Err(MyError::new(format!("URL must start with https://{{www.,m.,}}youtube.com/, was {}", url)).into());
     }
+    Ok(url)
+}
+
+fn do_archive(url: &str, user: &str, rtd: &Rtd) -> Result<String, Box<error::Error>> {
+    let url = fix_youtube_url(url)?;
     if url.starts_with("https://www.youtube.com/watch?") {
-        let channel_url = format!("https://www.youtube.com/channel/{}", get_youtube_channel(url)?);
+        let channel_url = format!("https://www.youtube.com/channel/{}", get_youtube_channel(&url)?);
         let folder = get_folder(&channel_url)?;
         let sessions = get_downloader_sessions()?;
         if let Some(_session) = sessions.iter().find(|session| session.identifier == folder) {
             return Ok(format!("Can't archive {} because another task is running in the same folder {}", &url, &folder));
         }
         let output = process::Command::new("grab-youtube-video")
-            .arg(&folder).arg(url)
+            .arg(&folder).arg(&url)
             .output()?;
         let _stdout_utf8 = str::from_utf8(&output.stdout)?;
         Ok(format!("Grabbing {} -> {}", &url, &folder))
     } else {
-        let canonical_url = get_canonical_url(url)?;
+        let canonical_url = get_canonical_url(&url)?;
         let folder = get_folder(&canonical_url)?;
         make_folder(&folder)?;
         let sessions = get_downloader_sessions()?;
@@ -151,13 +158,11 @@ fn make_folder(folder: &str) -> Result<(), Box<error::Error>> {
 }
 
 fn do_stash_check(url: &str) -> Result<String, Box<error::Error>> {
-    if !url.starts_with("https://www.youtube.com/") {
-        return Err(MyError::new(format!("URL must start with https://www.youtube.com/, was {}", url)).into());
-    }
+    let url = fix_youtube_url(url)?;
     if url.starts_with("https://www.youtube.com/watch?") {
         return Err(MyError::new("!s on /watch? URL not yet implemented".to_owned()).into());
     }
-    let canonical_url = get_canonical_url(url)?;
+    let canonical_url = get_canonical_url(&url)?;
     let folder = match folder_for_url(&canonical_url) {
         Some(f) => f,
         None => return Err(MyError::new(format!("Could not get folder for URL {}", canonical_url)).into()),
