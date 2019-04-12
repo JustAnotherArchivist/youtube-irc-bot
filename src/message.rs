@@ -37,21 +37,21 @@ pub fn handle_message(
                 }
             },
             msg if msg.starts_with("!s ") => {
-                let url = msg.splitn(2, ' ').last().unwrap();
+                let url = msg.split(' ').take(2).last().unwrap();
                 match do_stash_check(&url) {
                     Ok(reply) => client.send_privmsg(command_channel, format!("{}: {}", user, reply)).unwrap(),
                     Err(err)  => client.send_privmsg(command_channel, format!("{}: error: {}", user, err)).unwrap()
                 }
             },
             msg if msg.starts_with("!a ") => {
-                let url = msg.splitn(2, ' ').last().unwrap();
+                let url = msg.split(' ').take(2).last().unwrap();
                 match do_archive(&url, &user, &rtd) {
                     Ok(reply) => client.send_privmsg(command_channel, format!("{}: {}", user, reply)).unwrap(),
                     Err(err)  => client.send_privmsg(command_channel, format!("{}: error: {}", user, err)).unwrap()
                 }
             },
             msg if msg.starts_with("!abort ") => {
-                let task = msg.splitn(2, ' ').last().unwrap();
+                let task = msg.split(' ').take(2).last().unwrap();
                 match do_abort(&task) {
                     Ok(reply) => client.send_privmsg(command_channel, format!("{}: {}", user, reply)).unwrap(),
                     Err(err)  => client.send_privmsg(command_channel, format!("{}: error: {}", user, err)).unwrap()
