@@ -27,3 +27,7 @@ ping_timeout = 10
 burst_window_length = 8
 max_messages_in_burst = 15
 should_ghost = false
+
+[user_limits]
+Flashfire = 0
+flashfire = 0

@@ -127,9 +127,10 @@ fn assert_valid_task_name(task: &str) -> Result<(), Box<error::Error>> {
 }
 
 fn limit_for_user(user: &str, rtd: &Rtd) -> usize {
-    match user {
-        "Flashfire" => rtd.conf.params.task_limit - 1,
-        _           => rtd.conf.params.task_limit,
+    let user_limits = &rtd.conf.user_limits;
+    match user_limits.get(user) {
+        None         => rtd.conf.params.task_limit,
+        Some(&limit) => limit
     }
 }
 

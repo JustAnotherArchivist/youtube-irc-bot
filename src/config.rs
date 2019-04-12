@@ -5,6 +5,7 @@
 use std::fs;
 use std::fs::File;
 use std::io::Write;
+use std::collections::HashMap;
 use toml;
 use std::path::{Path, PathBuf};
 use irc::client::data::Config as IrcConfig;
@@ -28,6 +29,7 @@ pub struct Conf {
     pub params: Parameters,
     #[serde(rename = "connection")]
     pub client: IrcConfig,
+    pub user_limits: HashMap<String, usize>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -96,7 +98,8 @@ impl Default for Conf {
                 max_messages_in_burst: Some(15),
                 should_ghost: Some(false),
                 ..IrcConfig::default()
-            }
+            },
+            user_limits: HashMap::new(),
         }
     }
 }
