@@ -103,12 +103,12 @@ fn do_archive(url: &str, user: &str, rtd: &Rtd) -> Result<String, Box<error::Err
         let folder = get_folder(&canonical_url)?;
         make_folder(&folder)?;
         let sessions = get_downloader_sessions()?;
-        // This isn't a necessary safety check, just less confusing to the IRC user.
         if let Some(_session) = sessions.iter().find(|session| session.identifier == folder) {
-            return Ok(format!("Already archiving {} now", &folder));
+            return Ok(format!("Can't archive {} because another task is running in the same folder {}", &url, &folder));
         }
-        if sessions.len() >= limit_for_user(user, rtd) {
-            return Ok(format!("Created folder {} but too many downloaders are running, try !a again later", &folder));
+        let limit = limit_for_user(user, rtd);
+        if sessions.len() >= limit {
+            return Ok(format!("Can't archive {} because too many downloaders are running (your limit = {}), try again later", &url, limit));
         }
         let limit = 999999;
         let output = process::Command::new("grab-youtube-channel")
