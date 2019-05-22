@@ -72,8 +72,12 @@ pub fn get_folder(url: &str) -> Result<String, Box<error::Error>> {
 }
 
 fn fix_youtube_url(url: &str) -> Result<String, Box<error::Error>> {
+    let url = url.replace("http://", "https://");
     let url = url.replace("https://m.youtube.com/", "https://www.youtube.com/");
     let url = url.replace("https://youtube.com/", "https://www.youtube.com/");
+    // Fix annoying links that fail to load on mobile
+    let url = url.replace("?disable_polymer=1", "");
+    let url = url.replace("&disable_polymer=1", "");
     if !url.starts_with("https://www.youtube.com/") {
         return Err(MyError::new(format!("URL must start with https://{{www.,m.,}}youtube.com/, was {}", url)).into());
     }
