@@ -24,41 +24,44 @@ pub fn handle_message(
     };
 
     let user = message.source_nickname().unwrap();
-
-    let command_channel = &rtd.conf.params.command_channel;
-    if message.response_target() == Some(command_channel) {
+    let channel = &rtd.conf.params.command_channel;
+    if message.response_target() == Some(channel) {
         match msg.as_ref() {
             "!help" => {
-                client.send_privmsg(command_channel, get_help()).unwrap()
+                client.send_privmsg(channel, get_help()).unwrap()
             },
             "!status" => {
                 for message in get_status(rtd) {
-                    client.send_privmsg(command_channel, message).unwrap()
+                    client.send_privmsg(channel, message).unwrap()
                 }
+            },
+            "!stopscripts" => {
+                send_reply(client, channel, user, stop_scripts());
+            },
+            "!contscripts" => {
+                send_reply(client, channel, user, cont_scripts());
             },
             msg if msg.starts_with("!s ") => {
                 let url = msg.split(' ').take(2).last().unwrap();
-                match do_stash_check(&url) {
-                    Ok(reply) => client.send_privmsg(command_channel, format!("{}: {}", user, reply)).unwrap(),
-                    Err(err)  => client.send_privmsg(command_channel, format!("{}: error: {}", user, err)).unwrap()
-                }
+                send_reply(client, channel, user, do_stash_check(&url));
             },
             msg if msg.starts_with("!a ") => {
                 let url = msg.split(' ').take(2).last().unwrap();
-                match do_archive(&url, &user, &rtd) {
-                    Ok(reply) => client.send_privmsg(command_channel, format!("{}: {}", user, reply)).unwrap(),
-                    Err(err)  => client.send_privmsg(command_channel, format!("{}: error: {}", user, err)).unwrap()
-                }
+                send_reply(client, channel, user, do_archive(&url, &user, &rtd));
             },
             msg if msg.starts_with("!abort ") => {
                 let task = msg.split(' ').take(2).last().unwrap();
-                match do_abort(&task) {
-                    Ok(reply) => client.send_privmsg(command_channel, format!("{}: {}", user, reply)).unwrap(),
-                    Err(err)  => client.send_privmsg(command_channel, format!("{}: error: {}", user, err)).unwrap()
-                }
+                send_reply(client, channel, user, do_abort(&task));
             },
             _other => {},
         }
+    }
+}
+
+fn send_reply(client: &IrcClient, channel: &str, user: &str, result: Result<String, Box<error::Error>>) {
+    match result {
+        Ok(reply) => client.send_privmsg(channel, format!("{}: {}", user, reply)).unwrap(),
+        Err(err)  => client.send_privmsg(channel, format!("{}: error: {}", user, err)).unwrap()
     }
 }
 
@@ -262,13 +265,23 @@ fn get_file_listing(folder: &str) -> Result<Vec<String>, Box<error::Error>> {
 }
 
 fn get_help() -> String {
-    "Usage: !help | !status | !a <user or channel or watch URL> | !s <user or channel URL> | !abort <task>".into()
+    "Usage: !help | !status | !a <user or channel or watch URL> | !s <user or channel URL> | !abort <task> | !stopscripts | !contscripts".into()
 }
 
 #[derive(Debug)]
 struct DownloaderSession {
     identifier: String,
     start_time: u64,
+}
+
+fn stop_scripts() -> Result<String, Box<error::Error>> {
+    let _ = process::Command::new("stop-all-youtube-scripts").output()?;
+    Ok("Stopped all scripts".to_owned())
+}
+
+fn cont_scripts() -> Result<String, Box<error::Error>> {
+    let _ = process::Command::new("cont-all-youtube-scripts").output()?;
+    Ok("Continued all scripts".to_owned())
 }
 
 fn get_status(rtd: &Rtd) -> Vec<String> {
