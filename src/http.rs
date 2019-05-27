@@ -92,11 +92,11 @@ fn parse_user(page_contents: &str) -> Option<String> {
 fn parse_channel(page_contents: &str) -> Option<String> {
     lazy_static! {
         static ref CHANNEL_META_RE: Regex = Regex::new(r#"<meta itemprop="channelId" content="([^"]+)">"#).unwrap();
-        static ref CHANNEL_SUBSCRIBE_RE: Regex = Regex::new(r#" data-channel-external-id="([^"]+)""#).unwrap();
+        static ref CHANNEL_VIDEO_DETAILS_RE: Regex = Regex::new(r#" ytplayer = .+?\\"channelId\\":\\"([^"]+)\\""#).unwrap();
     }
     match &CHANNEL_META_RE.captures(page_contents) {
         Some(captures) if captures.len() >= 1 => Some(captures.get(1).unwrap().as_str().to_owned()),
-        _ => match &CHANNEL_SUBSCRIBE_RE.captures(page_contents) {
+        _ => match &CHANNEL_VIDEO_DETAILS_RE.captures(page_contents) {
             Some(captures) if captures.len() >= 1 => Some(captures.get(1).unwrap().as_str().to_owned()),
             _ => None
         }
