@@ -58,14 +58,14 @@ pub fn handle_message(
     }
 }
 
-fn send_reply(client: &IrcClient, channel: &str, user: &str, result: Result<String, Box<error::Error>>) {
+fn send_reply(client: &IrcClient, channel: &str, user: &str, result: Result<String, Box<dyn error::Error>>) {
     match result {
         Ok(reply) => client.send_privmsg(channel, format!("{}: {}", user, reply)).unwrap(),
         Err(err)  => client.send_privmsg(channel, format!("{}: error: {}", user, err)).unwrap()
     }
 }
 
-pub fn get_folder(url: &str) -> Result<String, Box<error::Error>> {
+pub fn get_folder(url: &str) -> Result<String, Box<dyn error::Error>> {
     let canonical_url = get_canonical_url(url)?;
     let folder = match folder_for_url(&canonical_url) {
         Some(f) => f,
@@ -74,7 +74,7 @@ pub fn get_folder(url: &str) -> Result<String, Box<error::Error>> {
     Ok(folder)
 }
 
-fn fix_youtube_url(url: &str) -> Result<String, Box<error::Error>> {
+fn fix_youtube_url(url: &str) -> Result<String, Box<dyn error::Error>> {
     let url = url.replace("http://", "https://");
     let url = url.replace("https://m.youtube.com/", "https://www.youtube.com/");
     let url = url.replace("https://youtube.com/", "https://www.youtube.com/");
@@ -88,7 +88,7 @@ fn fix_youtube_url(url: &str) -> Result<String, Box<error::Error>> {
     Ok(url)
 }
 
-fn do_archive(url: &str, user: &str, rtd: &Rtd) -> Result<String, Box<error::Error>> {
+fn do_archive(url: &str, user: &str, rtd: &Rtd) -> Result<String, Box<dyn error::Error>> {
     let url = fix_youtube_url(url)?;
     if url.starts_with("https://www.youtube.com/watch?") {
         let channel_url = format!("https://www.youtube.com/channel/{}", get_youtube_channel(&url)?);
@@ -123,7 +123,7 @@ fn do_archive(url: &str, user: &str, rtd: &Rtd) -> Result<String, Box<error::Err
     }
 }
 
-fn do_abort(task: &str) -> Result<String, Box<error::Error>> {
+fn do_abort(task: &str) -> Result<String, Box<dyn error::Error>> {
     assert_valid_task_name(task)?;
     let session = format!("YouTube-{}", task);
     let _output = process::Command::new("tmux")
@@ -132,7 +132,7 @@ fn do_abort(task: &str) -> Result<String, Box<error::Error>> {
     Ok(format!("Aborted {}", &task))
 }
 
-fn assert_valid_task_name(task: &str) -> Result<(), Box<error::Error>> {
+fn assert_valid_task_name(task: &str) -> Result<(), Box<dyn error::Error>> {
     let re = regex::Regex::new(r"\A[-_A-Za-z0-9]+\z").unwrap();
     if re.is_match(task) {
         Ok(())
@@ -149,7 +149,7 @@ fn limit_for_user(user: &str, rtd: &Rtd) -> usize {
     }
 }
 
-fn make_folder(folder: &str) -> Result<(), Box<error::Error>> {
+fn make_folder(folder: &str) -> Result<(), Box<dyn error::Error>> {
     let home    = dirs::home_dir().unwrap();
     let youtube = home.as_path().join("YouTube");
     let output  = process::Command::new("timeout")
@@ -165,7 +165,7 @@ fn make_folder(folder: &str) -> Result<(), Box<error::Error>> {
     }
 }
 
-fn do_stash_check(url: &str) -> Result<String, Box<error::Error>> {
+fn do_stash_check(url: &str) -> Result<String, Box<dyn error::Error>> {
     let url = fix_youtube_url(url)?;
     if url.starts_with("https://www.youtube.com/watch?") {
         return Err(MyError::new("!s on /watch? URL not yet implemented".to_owned()).into());
@@ -196,7 +196,7 @@ fn do_stash_check(url: &str) -> Result<String, Box<error::Error>> {
 
 /// Ensure that a YouTube URL actually exists and convert https://www.youtube.com/channel/*
 /// to https://www.youtube.com/user/* when possible.
-fn get_canonical_url(url: &str) -> Result<String, Box<error::Error>> {
+fn get_canonical_url(url: &str) -> Result<String, Box<dyn error::Error>> {
     let parsed_url = url::Url::parse(url).unwrap();
     let canonical_url: String = match parsed_url.path() {
         "/playlist" => {
@@ -257,7 +257,7 @@ fn folder_for_url(url: &str) -> Option<String> {
     }
 }
 
-fn get_file_listing(folder: &str) -> Result<Vec<String>, Box<error::Error>> {
+fn get_file_listing(folder: &str) -> Result<Vec<String>, Box<dyn error::Error>> {
     let output = process::Command::new("ts")
         .arg("ls").arg("-n").arg("YouTube").arg("-j").arg("-t").arg(folder)
         .output()?;
@@ -275,12 +275,12 @@ struct DownloaderSession {
     start_time: u64,
 }
 
-fn stop_scripts() -> Result<String, Box<error::Error>> {
+fn stop_scripts() -> Result<String, Box<dyn error::Error>> {
     let _ = process::Command::new("stop-all-youtube-scripts").output()?;
     Ok("Stopped all scripts".to_owned())
 }
 
-fn cont_scripts() -> Result<String, Box<error::Error>> {
+fn cont_scripts() -> Result<String, Box<dyn error::Error>> {
     let _ = process::Command::new("cont-all-youtube-scripts").output()?;
     Ok("Continued all scripts".to_owned())
 }
@@ -339,7 +339,7 @@ fn duration_to_dhm(secs: u64) -> String {
     }
 }
 
-fn get_downloader_sessions() -> Result<Vec<DownloaderSession>, Box<error::Error>> {
+fn get_downloader_sessions() -> Result<Vec<DownloaderSession>, Box<dyn error::Error>> {
     let output = process::Command::new("tmux")
         .arg("list-sessions")
         .arg("-F")
