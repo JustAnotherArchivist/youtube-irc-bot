@@ -9,6 +9,11 @@ use super::http::{get_youtube_user, get_youtube_channel};
 use super::config::Rtd;
 use super::error::MyError;
 
+enum VideoSize {
+    Normal,
+    Big
+}
+
 pub fn handle_message(
     client: &IrcClient, message: &Message, rtd: &Rtd
 ) {
@@ -47,7 +52,11 @@ pub fn handle_message(
             },
             msg if msg.starts_with("!a ") => {
                 let url = msg.split(' ').take(2).last().unwrap();
-                send_reply(client, channel, user, do_archive(&url, &user, &rtd));
+                send_reply(client, channel, user, do_archive(&url, VideoSize::Normal, &user, &rtd));
+            },
+            msg if msg.starts_with("!abig ") => {
+                let url = msg.split(' ').take(2).last().unwrap();
+                send_reply(client, channel, user, do_archive(&url, VideoSize::Big, &user, &rtd));
             },
             msg if msg.starts_with("!abort ") => {
                 let task = msg.split(' ').take(2).last().unwrap();
@@ -88,7 +97,7 @@ fn fix_youtube_url(url: &str) -> Result<String, Box<dyn error::Error>> {
     Ok(url)
 }
 
-fn do_archive(url: &str, user: &str, rtd: &Rtd) -> Result<String, Box<dyn error::Error>> {
+fn do_archive(url: &str, video_size: VideoSize, user: &str, rtd: &Rtd) -> Result<String, Box<dyn error::Error>> {
     let url = fix_youtube_url(url)?;
     if url.starts_with("https://www.youtube.com/watch?") {
         let channel_url = format!("https://www.youtube.com/channel/{}", get_youtube_channel(&url)?);
@@ -97,7 +106,11 @@ fn do_archive(url: &str, user: &str, rtd: &Rtd) -> Result<String, Box<dyn error:
         if let Some(_session) = sessions.iter().find(|session| session.identifier == folder) {
             return Ok(format!("Can't archive {} because another task is running in the same folder {}", &url, &folder));
         }
-        let output = process::Command::new("grab-youtube-video")
+        let command = match video_size {
+            VideoSize::Normal => "grab-youtube-video",
+            VideoSize::Big    => "grab-youtube-video-big-video"
+        };
+        let output = process::Command::new(command)
             .arg(&folder).arg(&url)
             .output()?;
         let _stdout_utf8 = str::from_utf8(&output.stdout)?;
@@ -115,7 +128,11 @@ fn do_archive(url: &str, user: &str, rtd: &Rtd) -> Result<String, Box<dyn error:
             return Ok(format!("Can't archive {} because too many downloaders are running (your limit = {}), try again later", &url, limit));
         }
         let limit = 999999;
-        let output = process::Command::new("grab-youtube-channel")
+        let command = match video_size {
+            VideoSize::Normal => "grab-youtube-channel",
+            VideoSize::Big    => "grab-youtube-channel-big-videos"
+        };
+        let output = process::Command::new(command)
             .arg(&folder).arg(limit.to_string())
             .output()?;
         let _stdout_utf8 = str::from_utf8(&output.stdout)?;
@@ -266,7 +283,7 @@ fn get_file_listing(folder: &str) -> Result<Vec<String>, Box<dyn error::Error>> 
 }
 
 fn get_help() -> String {
-    "Usage: !help | !status | !a <user or channel or watch URL> | !s <user or channel URL> | !abort <task> | !stopscripts | !contscripts".into()
+    "Usage: !help | !status | !a <user or channel or watch URL> | !abig <user or channel or watch URL with large videos> | !s <user or channel URL> | !abort <task> | !stopscripts | !contscripts".into()
 }
 
 #[derive(Debug)]
