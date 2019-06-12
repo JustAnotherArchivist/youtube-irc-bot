@@ -35,7 +35,7 @@ pub fn handle_message(
             "!help" => {
                 client.send_privmsg(channel, get_help()).unwrap()
             },
-            "!status" => {
+            "!status" | "clear screen" => {
                 for message in get_status(rtd) {
                     client.send_privmsg(channel, message).unwrap()
                 }
