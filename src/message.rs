@@ -35,8 +35,11 @@ pub fn handle_message(
             "!help" => {
                 client.send_privmsg(channel, get_help()).unwrap()
             },
-            "!status" | "clear screen" => {
-                for message in get_status(rtd) {
+            "!status" => {
+                send_reply(client, channel, user, get_status(rtd));
+            },
+            "clear screen" => {
+                for message in get_full_status(rtd) {
                     client.send_privmsg(channel, message).unwrap()
                 }
             },
@@ -302,7 +305,14 @@ fn cont_scripts() -> Result<String, Box<dyn error::Error>> {
     Ok("Continued all scripts".to_owned())
 }
 
-fn get_status(rtd: &Rtd) -> Vec<String> {
+fn get_status(rtd: &Rtd) -> Result<String, Box<dyn error::Error>> {
+    let sessions    = get_downloader_sessions()?;
+    let scripts     = process::Command::new("get-running-youtube-scripts").output()?.stdout;
+    let num_scripts = scripts.iter().filter(|&&c| c == b'\n').count();
+    Ok(format!("{}/{} downloaders, {} scripts running", sessions.len(), rtd.conf.params.task_limit, num_scripts))
+}
+
+fn get_full_status(rtd: &Rtd) -> Vec<String> {
     match get_downloader_sessions() {
         Err(e) => vec![format!("{:?}", e)],
         Ok(mut sessions) => {
