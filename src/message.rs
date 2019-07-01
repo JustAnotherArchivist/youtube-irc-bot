@@ -226,8 +226,12 @@ fn get_canonical_url(url: &str) -> Result<String, Box<dyn error::Error>> {
         p if p.starts_with("/user/") => {
             let user = get_youtube_user(url)?;
             match user {
-                Some(user) => format!("https://www.youtube.com/user/{}/videos", user),
-                _ => return Err(MyError::new(format!("Canonical URL for {} does not have a /user/", url)).into())
+                Some(user) => {
+                    format!("https://www.youtube.com/user/{}/videos", user)
+                },
+                _ => {
+                    return Err(MyError::new(format!("Canonical URL for {} does not have a /user/", url)).into())
+                }
             }
         },
         p if p.starts_with("/channel/") => {
@@ -256,7 +260,11 @@ fn folder_for_url(url: &str) -> Option<String> {
         },
         p if p.starts_with("/user/") => {
             if let Some(user) = p.splitn(4, '/').map(String::from).collect::<Vec<String>>().get(2) {
-                Some(user.clone())
+                if user == "TEDxTalks" {
+                    Some("UCsT0YIqwnpJCM-mx7-gSA4Q".into())
+                } else {
+                    Some(user.clone())
+                }
             } else {
                 None
             }
