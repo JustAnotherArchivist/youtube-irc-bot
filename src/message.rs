@@ -88,9 +88,10 @@ pub fn get_folder(url: &str) -> Result<String, Box<dyn error::Error>> {
 
 fn fix_youtube_url(url: &str) -> Result<String, Box<dyn error::Error>> {
     let url = url.replace("http://", "https://");
+    let url = url.replace("https://invidio.us/",    "https://www.youtube.com/");
     let url = url.replace("https://m.youtube.com/", "https://www.youtube.com/");
-    let url = url.replace("https://youtube.com/", "https://www.youtube.com/");
-    let url = url.replace("https://youtu.be/", "https://www.youtube.com/watch?v=");
+    let url = url.replace("https://youtube.com/",   "https://www.youtube.com/");
+    let url = url.replace("https://youtu.be/",      "https://www.youtube.com/watch?v=");
     // Fix annoying links that fail to load on mobile
     let url = url.replace("?disable_polymer=1", "");
     let url = url.replace("&disable_polymer=1", "");
