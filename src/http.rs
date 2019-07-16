@@ -1,57 +1,18 @@
 use htmlescape::decode_html;
-use std::time::Duration;
 use itertools::Itertools;
 use regex::Regex;
 use failure::Error;
-use reqwest::Client;
-use reqwest::header::{USER_AGENT, ACCEPT_LANGUAGE, CONTENT_TYPE};
-use std::io::{Read, BufRead, BufReader};
-use std::fs::File;
-use mime::{Mime, TEXT, HTML};
-use rand::thread_rng;
-use rand::seq::SliceRandom;
+use std::process;
+use std::str;
 
 use super::error::MyError;
 
 fn contents_for_url(url: &str) -> Result<String, Error> {
-    let proxies: Vec<String> = BufReader::new(File::open("/home/at/.config/youtube-dl/proxies").unwrap()).lines().map(|l| l.unwrap()).collect();
-    let mut rng = thread_rng();
-    let proxy_url = proxies.choose(&mut rng).unwrap();
-
-    dbg!(proxy_url);
-
-    let client = Client::builder()
-        .proxy(reqwest::Proxy::all(proxy_url)?)
-        .timeout(Duration::from_secs(10)) // per read/write op
-        .build()?;
-
-    let resp = client.get(url)
-        .header(USER_AGENT, "curl/7.37.0") // Get the old no-Polymer pages
-        .header(ACCEPT_LANGUAGE, "en")
-        .send()?
-        .error_for_status()?;
-
-    let content_type = resp.headers().get(CONTENT_TYPE)
-        .and_then(|typ| typ.to_str().ok())
-        .and_then(|typ| typ.parse::<Mime>().ok());
-
-    match content_type {
-        Some(mime) => {
-            match (mime.type_(), mime.subtype()) {
-                (TEXT, HTML) => (),
-                mime => {
-                    return Err(MyError::new(format!("Expected text/html mime type but got {:?}", mime)).into());
-                }
-            }
-        },
-        None => {
-            return Err(MyError::new("Expected text/html mime type but did not get a mime type".into()).into());
-        }
-    };
-
-    let mut body = Vec::new();
-    resp.take(10 * 1024 * 1024).read_to_end(&mut body)?;
-    Ok(String::from_utf8_lossy(&body).into())
+    let output = process::Command::new("get-youtube-page")
+        .arg(&url)
+        .output()?;
+    let body = str::from_utf8(&output.stdout)?;
+    Ok(body.into())
 }
 
 pub fn get_youtube_user(url: &str) -> Result<Option<String>, Error> {

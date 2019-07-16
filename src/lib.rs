@@ -7,7 +7,6 @@ extern crate regex;
 extern crate lazy_static;
 extern crate htmlescape;
 extern crate time;
-extern crate reqwest;
 extern crate mime;
 extern crate humansize;
 extern crate unicode_segmentation;
