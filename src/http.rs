@@ -5,13 +5,23 @@ use regex::Regex;
 use failure::Error;
 use reqwest::Client;
 use reqwest::header::{USER_AGENT, ACCEPT_LANGUAGE, CONTENT_TYPE};
-use std::io::Read;
+use std::io::{Read, BufRead, BufReader};
+use std::fs::File;
 use mime::{Mime, TEXT, HTML};
+use rand::thread_rng;
+use rand::seq::SliceRandom;
 
 use super::error::MyError;
 
 fn contents_for_url(url: &str) -> Result<String, Error> {
+    let proxies: Vec<String> = BufReader::new(File::open("/home/at/.config/youtube-dl/proxies").unwrap()).lines().map(|l| l.unwrap()).collect();
+    let mut rng = thread_rng();
+    let proxy_url = proxies.choose(&mut rng).unwrap();
+
+    dbg!(proxy_url);
+
     let client = Client::builder()
+        .proxy(reqwest::Proxy::all(proxy_url)?)
         .timeout(Duration::from_secs(10)) // per read/write op
         .build()?;
 
