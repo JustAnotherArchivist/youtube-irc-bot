@@ -4,6 +4,7 @@ use std::str;
 use std::error;
 use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
+use regex::Regex;
 
 use super::http::{get_youtube_user, get_youtube_channel};
 use super::config::Rtd;
@@ -30,6 +31,17 @@ pub fn handle_message(
 
     let user = message.source_nickname().unwrap();
     let channel = &rtd.conf.params.command_channel;
+
+    lazy_static! {
+        static ref WEBCHAT_RE: Regex = Regex::new(r"\A.+!webchat@.+\z").unwrap();
+    }
+    if let Some(prefix) = &message.prefix {
+        if WEBCHAT_RE.is_match(prefix) {
+            send_reply(client, channel, user, Ok("webchat users are not authorized; use any other IRC client, or ask someone else to do it".into()));
+            return;
+        }
+    }
+
     if message.response_target() == Some(channel) {
         match msg.as_ref() {
             "!help" => {
@@ -153,8 +165,10 @@ fn do_abort(task: &str) -> Result<String, Box<dyn error::Error>> {
 }
 
 fn assert_valid_task_name(task: &str) -> Result<(), Box<dyn error::Error>> {
-    let re = regex::Regex::new(r"\A[-_A-Za-z0-9]+\z").unwrap();
-    if re.is_match(task) {
+    lazy_static! {
+        static ref TASK_NAME_RE: Regex = Regex::new(r"\A[-_A-Za-z0-9]+\z").unwrap();
+    }
+    if TASK_NAME_RE.is_match(task) {
         Ok(())
     } else {
         Err(MyError::new(format!("Invalid task name: {}", task)).into())
@@ -278,9 +292,11 @@ fn folder_for_url(url: &str) -> Option<String> {
         },
         _p => None
     };
-    let re = regex::Regex::new(r"\A[-_A-Za-z0-9]+\z").unwrap();
+    lazy_static! {
+        static ref FOLDER_RE: Regex = Regex::new(r"\A[-_A-Za-z0-9]+\z").unwrap();
+    }
     match folder {
-        Some(ref f) if re.is_match(f) => Some(f.clone()),
+        Some(ref f) if FOLDER_RE.is_match(f) => Some(f.clone()),
         _ => None
     }
 }
