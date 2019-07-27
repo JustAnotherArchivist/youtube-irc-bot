@@ -17,7 +17,7 @@ enum VideoSize {
 
 pub fn handle_message(
     client: &IrcClient, message: &Message, rtd: &Rtd
-) {
+) -> Result<(), Box<dyn std::error::Error>> {
     // print the message if debug flag is set
     if rtd.args.flag_debug {
         eprintln!("{:?}", message.command)
@@ -26,7 +26,7 @@ pub fn handle_message(
     // match on message type
     let (_target, msg) = match message.command {
         Command::PRIVMSG(ref target, ref msg) => (target, msg),
-        _ => return,
+        _ => return Ok(()),
     };
 
     let user = message.source_nickname().unwrap();
@@ -35,12 +35,15 @@ pub fn handle_message(
     lazy_static! {
         static ref WEBCHAT_RE: Regex = Regex::new(r"\A.+!webchat@.+\z").unwrap();
     }
-    if let Some(prefix) = &message.prefix {
-        if WEBCHAT_RE.is_match(prefix) {
-            send_reply(client, channel, user, Ok("webchat users are not authorized; use any other IRC client, or ask someone else to do it".into()));
-            return;
+    let check_authorization = || {
+        if let Some(prefix) = &message.prefix {
+            if WEBCHAT_RE.is_match(prefix) {
+                send_reply(client, channel, user, Ok("webchat users are not authorized; use any other IRC client, or ask someone else to do it".into()));
+                return Err(MyError::new("webchat users are not authorized".into()));
+            }
         }
-    }
+        return Ok(());
+    };
 
     if message.response_target() == Some(channel) {
         match msg.as_ref() {
@@ -51,14 +54,17 @@ pub fn handle_message(
                 send_reply(client, channel, user, get_status(rtd));
             },
             "clear screen" => {
+                check_authorization()?;
                 for message in get_full_status(rtd) {
                     client.send_privmsg(channel, message).unwrap()
                 }
             },
             "!stopscripts" => {
+                check_authorization()?;
                 send_reply(client, channel, user, stop_scripts());
             },
             "!contscripts" => {
+                check_authorization()?;
                 send_reply(client, channel, user, cont_scripts());
             },
             msg if msg.starts_with("!s ") => {
@@ -66,20 +72,24 @@ pub fn handle_message(
                 send_reply(client, channel, user, do_stash_check(&url));
             },
             msg if msg.starts_with("!a ") => {
+                check_authorization()?;
                 let url = msg.split(' ').take(2).last().unwrap();
                 send_reply(client, channel, user, do_archive(&url, VideoSize::Normal, &user, &rtd));
             },
             msg if msg.starts_with("!abig ") => {
+                check_authorization()?;
                 let url = msg.split(' ').take(2).last().unwrap();
                 send_reply(client, channel, user, do_archive(&url, VideoSize::Big, &user, &rtd));
             },
             msg if msg.starts_with("!abort ") => {
+                check_authorization()?;
                 let task = msg.split(' ').take(2).last().unwrap();
                 send_reply(client, channel, user, do_abort(&task));
             },
             _other => {},
         }
     }
+    Ok(())
 }
 
 fn send_reply(client: &IrcClient, channel: &str, user: &str, result: Result<String, Box<dyn error::Error>>) {
