@@ -54,7 +54,7 @@ fn main() {
 
     // register handler
     reactor.register_client_with_handler(client, move |client, message| {
-        handle_message(client, &message, &rtd);
+        let _ = handle_message(client, &message, &rtd);
         Ok(())
     });
 

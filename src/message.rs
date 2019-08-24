@@ -76,6 +76,12 @@ pub fn handle_message(
                 let url = msg.split(' ').take(2).last().unwrap();
                 send_reply(client, channel, user, do_archive(&url, VideoSize::Normal, &user, &rtd));
             },
+            msg if msg.starts_with("!sa ") => {
+                check_authorization()?;
+                let url = msg.split(' ').take(2).last().unwrap();
+                send_reply(client, channel, user, do_stash_check(&url));
+                send_reply(client, channel, user, do_archive(&url, VideoSize::Normal, &user, &rtd));
+            },
             msg if msg.starts_with("!abig ") => {
                 check_authorization()?;
                 let url = msg.split(' ').take(2).last().unwrap();
