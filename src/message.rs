@@ -87,6 +87,12 @@ pub fn handle_message(
                 let url = msg.split(' ').take(2).last().unwrap();
                 send_reply(client, channel, user, do_archive(&url, VideoSize::Big, &user, &rtd));
             },
+            msg if msg.starts_with("!sabig ") => {
+                check_authorization()?;
+                let url = msg.split(' ').take(2).last().unwrap();
+                send_reply(client, channel, user, do_stash_check(&url));
+                send_reply(client, channel, user, do_archive(&url, VideoSize::Big, &user, &rtd));
+            },
             msg if msg.starts_with("!abort ") => {
                 check_authorization()?;
                 let task = msg.split(' ').take(2).last().unwrap();
