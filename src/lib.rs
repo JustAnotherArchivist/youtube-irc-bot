@@ -16,4 +16,3 @@ extern crate url;
 
 pub mod config;
 pub mod message;
-pub mod duration;

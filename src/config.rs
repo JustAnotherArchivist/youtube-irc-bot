@@ -51,8 +51,8 @@ pub struct Parameters {
 impl Default for Parameters {
     fn default() -> Self {
         Self {
-            task_limit: 30,
-            command_channel: "".to_string(),
+            task_limit: 34,
+            command_channel: "#youtubearchive".to_string(),
         }
     }
 }
@@ -79,11 +79,11 @@ impl Default for Conf {
             features: Features::default(),
             params: Parameters::default(),
             client: IrcConfig {
-                nickname: Some("youtube-irc-bot".to_string()),
-                alt_nicks: Some(vec!["youtube-irc-bot_".to_string()]),
+                nickname: Some("botnick".to_string()),
+                alt_nicks: Some(vec!["botnick_".to_string()]),
                 nick_password: Some("".to_string()),
-                username: Some("youtube-irc-bot".to_string()),
-                realname: Some("youtube-irc-bot".to_string()),
+                username: Some("botnick".to_string()),
+                realname: Some("botnick".to_string()),
                 server: Some("chat.freenode.net".to_string()),
                 port: Some(6697),
                 password: Some("".to_string()),

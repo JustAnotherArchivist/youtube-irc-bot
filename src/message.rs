@@ -41,6 +41,7 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
+#[allow(clippy::let_and_return)]
 fn fix_youtube_url(url: &str) -> String {
     let url = url.replace("http://", "https://");
     let url = url.replace("https://m.youtube.com/", "https://www.youtube.com/");
@@ -125,11 +126,11 @@ pub enum YoutubeDescriptor {
 impl YoutubeDescriptor {
     pub fn from_url(url: &str) -> Result<YoutubeDescriptor> {
         lazy_static! {
-            static ref OLD_PLAYLIST_RE: Regex = Regex::new("https://www.youtube.com/playlist?list=(PL[0-9A-F]{16})").unwrap();
-            static ref NEW_PLAYLIST_RE: Regex = Regex::new("https://www.youtube.com/playlist?list=(PL[-_A-Za-z0-9]{32})").unwrap();
-            static ref WATCH_RE:        Regex = Regex::new("https://www.youtube.com/watch?v=([-_A-Za-z0-9]{11})").unwrap();
-            static ref CHANNEL_RE:      Regex = Regex::new("https://www.youtube.com/channel/(UC[-_A-Za-z0-9]{22})").unwrap();
-            static ref USER_RE:         Regex = Regex::new("https://www.youtube.com/user/([a-z][-_a-z0-9]{1,31})").unwrap();
+            static ref OLD_PLAYLIST_RE: Regex = Regex::new(r#"https://www.youtube.com/playlist\?list=(PL[0-9A-F]{16})"#).unwrap();
+            static ref NEW_PLAYLIST_RE: Regex = Regex::new(r#"https://www.youtube.com/playlist\?list=(PL[-_A-Za-z0-9]{32})"#).unwrap();
+            static ref WATCH_RE:        Regex = Regex::new(r#"https://www.youtube.com/watch\?v=([-_A-Za-z0-9]{11})"#).unwrap();
+            static ref CHANNEL_RE:      Regex = Regex::new(r#"https://www.youtube.com/channel/(UC[-_A-Za-z0-9]{22})"#).unwrap();
+            static ref USER_RE:         Regex = Regex::new(r#"https://www.youtube.com/user/([a-z][-_a-z0-9]{1,31})"#).unwrap();
         }
 
         let url = fix_youtube_url(url);
@@ -169,7 +170,7 @@ impl YoutubeDescriptor {
                 let contents = contents_for_url(&self.to_url())?;
                 let channel_id = extract_channel_id(&contents)?;
                 let folder = YoutubeDescriptor::Channel(channel_id).canonicalize()?.folder();
-                CanonicalizedYoutubeDescriptor { kind: FetchType::Video, id: id.clone(), folder: folder }
+                CanonicalizedYoutubeDescriptor { kind: FetchType::Video, id: id.clone(), folder }
             },
             YoutubeDescriptor::Playlist(id) => {
                 CanonicalizedYoutubeDescriptor { kind: FetchType::Playlist, id: id.clone(), folder: id.clone() }
@@ -223,7 +224,7 @@ pub fn handle_message(client: &IrcClient, message: &Message, rtd: &Rtd) -> Resul
                 return Err(Error::NotAuthorized);
             }
         }
-        return Ok(());
+        Ok(())
     };
 
     if message.response_target() == Some(channel) {
@@ -319,7 +320,7 @@ fn do_archive(url: &str, video_size: VideoSize, user: &str, rtd: &Rtd) -> Result
             if sessions.len() >= limit {
                 return Ok(format!("Can't archive {} because too many downloaders are running (your limit = {}), try again later", &url, limit));
             }
-            let limit = 999999;
+            let limit = 999_999;
             let command = match video_size {
                 VideoSize::Normal  => "grab-youtube-channel",
                 VideoSize::VeryBig => "grab-youtube-channel-big-videos"
@@ -432,7 +433,7 @@ fn cont_scripts() -> Result<String> {
 fn get_status(rtd: &Rtd) -> Result<String> {
     let sessions    = get_downloader_sessions()?;
     let scripts     = process::Command::new("get-running-youtube-scripts").output().context(Io)?.stdout;
-    let num_scripts = scripts.iter().filter(|&&c| c == b'\n').count();
+    let num_scripts = bytecount::count(&scripts, b'\n');
     Ok(format!("{}/{} downloaders, {} scripts running", sessions.len(), rtd.conf.params.task_limit, num_scripts))
 }
 

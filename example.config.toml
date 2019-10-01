@@ -20,7 +20,7 @@ password = ""
 use_ssl = true
 encoding = "UTF-8"
 channels = []
-user_info = "Feed me URLs."
+user_info = "Helpful bot"
 source = "https://github.com/video-archivist/youtube-irc-bot"
 ping_time = 180
 ping_timeout = 10
@@ -29,5 +29,3 @@ max_messages_in_burst = 15
 should_ghost = false
 
 [user_limits]
-Flashfire = 0
-flashfire = 0
