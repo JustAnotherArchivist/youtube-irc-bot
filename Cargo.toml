@@ -1,6 +1,6 @@
 [package]
 name = "youtube-irc-bot"
-version = "1.5.0"
+version = "2.0.0"
 repository = "https://github.com/video-archivist/youtube-irc-bot"
 license = "ISC"
 edition = "2018"
