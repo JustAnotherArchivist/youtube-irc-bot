@@ -356,7 +356,7 @@ fn get_help() -> String {
     !status | \
     !s <URL> | \
     !a <URL> | \
-    !sa <user or channel or watch URL> | \
+    !sa <URL> | \
     !averybig <URL w/ very large videos> | \
     !saverybig <URL w/ very large videos> | \
     !abort <task> | \
