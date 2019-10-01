@@ -212,8 +212,7 @@ fn archive(descriptor: &CanonicalizedYoutubeDescriptor, video_size: VideoSize, u
                 .arg(&folder).arg(&url)
                 .output()
                 .context(Io)?;
-            let _stdout_utf8 = str::from_utf8(&output.stdout).context(Utf8)?;
-            Ok(format!("Grabbing {} -> {}; check https://ya.borg.xyz/logs/dl/{}/ later", &url, &folder, &folder))
+            let _ = str::from_utf8(&output.stdout).context(Utf8)?;
         },
         FetchType::Channel | FetchType::User | FetchType::Playlist => {
             let tasks_limit = limit_for_user(user, rtd);
@@ -229,11 +228,10 @@ fn archive(descriptor: &CanonicalizedYoutubeDescriptor, video_size: VideoSize, u
                 .arg(&folder).arg(videos_limit.to_string())
                 .output()
                 .context(Io)?;
-            let _stdout_utf8 = str::from_utf8(&output.stdout).context(Utf8)?;
-            Ok(format!("Grabbing {} -> {}; check https://ya.borg.xyz/logs/dl/{}/ later", &url, &folder, &folder))
-
+            let _ = str::from_utf8(&output.stdout).context(Utf8)?;
         }
     }
+    Ok(format!("Grabbing {} -> {}; check https://ya.borg.xyz/logs/dl/{}/ later", &url, &folder, &folder))
 }
 
 fn assert_valid_task_name(task: &str) -> Result<()> {
