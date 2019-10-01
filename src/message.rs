@@ -3,6 +3,7 @@ use std::str;
 use std::process;
 use regex::Regex;
 use snafu::{ensure, ResultExt, Snafu, Backtrace};
+use ::phf::{Map, phf_map};
 
 use super::config::Rtd;
 
@@ -35,8 +36,8 @@ pub enum Error {
     ErrorCreatingFolder { folder: String },
     #[snafu(display("Channel ID in page {:?} does not match provided channel ID {:?}", page_channel_id, provided_channel_id))]
     PageChannelIdDoesNotMatch { page_channel_id: String, provided_channel_id: String },
-    #[snafu(display("Username in page {:?} does not match provided username {:?}", page_username, provided_username))]
-    PageUsernameDoesNotMatch { page_username: Option<String>, provided_username: Option<String> },
+    #[snafu(display("Body for {:?} was expected to have a username but does not", url))]
+    PageDoesNotHaveUsername { url: String },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -115,6 +116,12 @@ impl CanonicalizedYoutubeDescriptor {
     }
 }
 
+// Map of username -> folder for channels for which we do not want to store
+// videos in the folder `username`
+static USERNAME_EXCEPTIONS: Map<&'static str, &'static str> = phf_map! {
+    "TEDxTalks" => "UCsT0YIqwnpJCM-mx7-gSA4Q",
+};
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum YoutubeDescriptor {
     User(String),
@@ -175,23 +182,20 @@ impl YoutubeDescriptor {
             YoutubeDescriptor::Playlist(id) => {
                 CanonicalizedYoutubeDescriptor { kind: FetchType::Playlist, id: id.clone(), folder: id.clone() }
             },
-            YoutubeDescriptor::User(id) => {
-                let contents = contents_for_url(&self.to_url())?;
-                let username = extract_username(&contents);
-                ensure!(username.as_ref() == Some(id), PageUsernameDoesNotMatch { page_username: username, provided_username: Some(id.clone()) });
-                CanonicalizedYoutubeDescriptor { kind: FetchType::User, id: username.clone().unwrap(), folder: username.clone().unwrap() }
-            },
-            YoutubeDescriptor::Channel(id) => {
+            YoutubeDescriptor::Channel(_) | YoutubeDescriptor::User(_) => {
                 let contents = contents_for_url(&self.to_url())?;
                 let username = extract_username(&contents);
                 match username {
                     None => {
                         let channel_id = extract_channel_id(&contents)?;
-                        ensure!(&channel_id == id, PageChannelIdDoesNotMatch { page_channel_id: channel_id, provided_channel_id: id });
                         CanonicalizedYoutubeDescriptor { kind: FetchType::Channel, id: channel_id.clone(), folder: channel_id.clone() }
                     }
                     Some(username) => {
-                        CanonicalizedYoutubeDescriptor { kind: FetchType::User, id: username.clone(), folder: username.clone() }
+                        let mut folder = username.clone();
+                        if let Some(custom_folder) = USERNAME_EXCEPTIONS.get(username.as_str()) {
+                            folder = custom_folder.to_string();
+                        }
+                        CanonicalizedYoutubeDescriptor { kind: FetchType::User, id: username.clone(), folder }
                     }
                 }
             },

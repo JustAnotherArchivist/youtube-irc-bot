@@ -27,3 +27,4 @@ dirs = "1.0.4"
 rand = "0.7.0"
 snafu = "0.5.0"
 bytecount = "0.4.0"
+phf = { git = "https://github.com/sfackler/rust-phf", rev = "0d0082178568036736bb6d51cb91f95ca5a616c3", features = ["macros"] }
