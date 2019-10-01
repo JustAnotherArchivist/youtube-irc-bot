@@ -195,16 +195,15 @@ impl YoutubeDescriptor {
     }
 }
 
-fn archive(url: &str, video_size: VideoSize, user: &str, rtd: &Rtd) -> Result<String> {
-    let descriptor = YoutubeDescriptor::from_url(url)?.canonicalize()?;
+fn archive(descriptor: &CanonicalizedYoutubeDescriptor, video_size: VideoSize, user: &str, rtd: &Rtd) -> Result<String> {
+    let folder = descriptor.folder();
+    let url = descriptor.to_url();
+    let sessions = get_downloader_sessions()?;
+    if let Some(_session) = sessions.iter().find(|session| session.identifier == folder) {
+        return Ok(format!("Can't archive {} because another task is running in the same folder {}", &url, &folder));
+    }
     match descriptor.kind {
         FetchType::Video => {
-            let folder = descriptor.folder();
-            let url = descriptor.to_url();
-            let sessions = get_downloader_sessions()?;
-            if let Some(_session) = sessions.iter().find(|session| session.identifier == folder) {
-                return Ok(format!("Can't archive {} because another task is running in the same folder {}", &url, &folder));
-            }
             let command = match video_size {
                 VideoSize::Normal  => "grab-youtube-video",
                 VideoSize::VeryBig => "grab-youtube-video-big-video"
@@ -217,23 +216,17 @@ fn archive(url: &str, video_size: VideoSize, user: &str, rtd: &Rtd) -> Result<St
             Ok(format!("Grabbing {} -> {}; check https://ya.borg.xyz/logs/dl/{}/ later", &url, &folder, &folder))
         },
         FetchType::Channel | FetchType::User | FetchType::Playlist => {
-            let folder = descriptor.folder();
-            let url = descriptor.to_url();
-            let sessions = get_downloader_sessions()?;
-            if let Some(_session) = sessions.iter().find(|session| session.identifier == folder) {
-                return Ok(format!("Can't archive {} because another task is running in the same folder {}", &url, &folder));
+            let tasks_limit = limit_for_user(user, rtd);
+            if sessions.len() >= tasks_limit {
+                return Ok(format!("Can't archive {} because too many tasks are running (your limit = {}), try again later", &url, tasks_limit));
             }
-            let limit = limit_for_user(user, rtd);
-            if sessions.len() >= limit {
-                return Ok(format!("Can't archive {} because too many downloaders are running (your limit = {}), try again later", &url, limit));
-            }
-            let limit = 999_999;
+            let videos_limit = 999_999;
             let command = match video_size {
                 VideoSize::Normal  => "grab-youtube-channel",
                 VideoSize::VeryBig => "grab-youtube-channel-big-videos"
             };
             let output = process::Command::new(command)
-                .arg(&folder).arg(limit.to_string())
+                .arg(&folder).arg(videos_limit.to_string())
                 .output()
                 .context(Io)?;
             let _stdout_utf8 = str::from_utf8(&output.stdout).context(Utf8)?;
@@ -269,12 +262,11 @@ fn limit_for_user(user: &str, rtd: &Rtd) -> usize {
     }
 }
 
-fn check_stash(url: &str) -> Result<String> {
-    let descriptor = YoutubeDescriptor::from_url(url)?;
-    if let YoutubeDescriptor::Video(_) = descriptor {
+fn check_stash(descriptor: &CanonicalizedYoutubeDescriptor) -> Result<String> {
+    if descriptor.kind == FetchType::Video {
         return Err(Error::NotImplemented { what: "/s on /watch? URL".into() });
     }
-    let folder = descriptor.canonicalize()?.folder();
+    let folder = descriptor.folder();
     let listing = match get_file_listing(&folder) {
         Err(_) => return Err(Error::ErrorListingFiles { folder }),
         Ok(files) => files,
@@ -417,29 +409,34 @@ pub fn handle_message(client: &IrcClient, message: &Message, rtd: &Rtd) -> Resul
             },
             msg if msg.starts_with("!s ") => {
                 let url = msg.split(' ').take(2).last().unwrap();
-                send_reply(client, channel, user, check_stash(&url));
+                let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
+                send_reply(client, channel, user, check_stash(&descriptor));
             },
             msg if msg.starts_with("!a ") => {
                 check_authorization()?;
                 let url = msg.split(' ').take(2).last().unwrap();
-                send_reply(client, channel, user, archive(&url, VideoSize::Normal, &user, &rtd));
+                let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
+                send_reply(client, channel, user, archive(&descriptor, VideoSize::Normal, &user, &rtd));
             },
             msg if msg.starts_with("!sa ") => {
                 check_authorization()?;
                 let url = msg.split(' ').take(2).last().unwrap();
-                send_reply(client, channel, user, check_stash(&url));
-                send_reply(client, channel, user, archive(&url, VideoSize::Normal, &user, &rtd));
+                let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
+                send_reply(client, channel, user, check_stash(&descriptor));
+                send_reply(client, channel, user, archive(&descriptor, VideoSize::Normal, &user, &rtd));
             },
             msg if msg.starts_with("!averybig ") => {
                 check_authorization()?;
                 let url = msg.split(' ').take(2).last().unwrap();
-                send_reply(client, channel, user, archive(&url, VideoSize::VeryBig, &user, &rtd));
+                let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
+                send_reply(client, channel, user, archive(&descriptor, VideoSize::VeryBig, &user, &rtd));
             },
             msg if msg.starts_with("!saverybig ") => {
                 check_authorization()?;
                 let url = msg.split(' ').take(2).last().unwrap();
-                send_reply(client, channel, user, check_stash(&url));
-                send_reply(client, channel, user, archive(&url, VideoSize::VeryBig, &user, &rtd));
+                let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
+                send_reply(client, channel, user, check_stash(&descriptor));
+                send_reply(client, channel, user, archive(&descriptor, VideoSize::VeryBig, &user, &rtd));
             },
             msg if msg.starts_with("!abort ") => {
                 check_authorization()?;
