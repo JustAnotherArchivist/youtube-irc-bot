@@ -132,7 +132,7 @@ impl YoutubeDescriptor {
             static ref NEW_PLAYLIST_RE: Regex = Regex::new(r#"https://www.youtube.com/playlist\?list=(PL[-_A-Za-z0-9]{32})"#).unwrap();
             static ref WATCH_RE:        Regex = Regex::new(r#"https://www.youtube.com/watch\?v=([-_A-Za-z0-9]{11})"#).unwrap();
             static ref CHANNEL_RE:      Regex = Regex::new(r#"https://www.youtube.com/channel/(UC[-_A-Za-z0-9]{22})"#).unwrap();
-            static ref USER_RE:         Regex = Regex::new(r#"https://www.youtube.com/user/([a-z][-_a-z0-9]{1,31})"#).unwrap();
+            static ref USER_RE:         Regex = Regex::new(r#"https://www.youtube.com/user/([A-Za-z0-9]{1,20})"#).unwrap();
         }
 
         let url = fix_youtube_url(url);
@@ -343,26 +343,91 @@ fn get_downloader_sessions() -> Result<Vec<DownloaderSession>> {
     Ok(sessions)
 }
 
-fn get_help() -> String {
-    "Usage: \
-    !help | \
-    !status | \
-    !s <URL> | \
-    !a <URL> | \
-    !sa <URL> | \
-    !averybig <URL w/ very large videos> | \
-    !saverybig <URL w/ very large videos> | \
-    !abort <task> | \
-    !stopscripts | \
-    !contscripts".to_string()
+fn get_help() -> Result<String> {
+    Ok(
+        "Usage: \
+        !help | \
+        !status | \
+        !s <URL> | \
+        !a <URL> | \
+        !sa <URL> | \
+        !averybig <URL w/ very large videos> | \
+        !saverybig <URL w/ very large videos> | \
+        !abort <task> | \
+        !stopscripts | \
+        !contscripts".to_string()
+    )
 }
 
 fn send_reply(client: &IrcClient, channel: &str, user: &str, result: Result<String>) {
     match result {
         Ok(reply) => client.send_privmsg(channel, format!("{}: {}", user, reply)).unwrap(),
-        Err(err)  => client.send_privmsg(channel, format!("{}: error: {}", user, err)).unwrap()
+        Err(err)  => client.send_privmsg(channel, format!("{}: error: {}", user, err)).unwrap(),
     }
 }
+
+pub fn dispatch_message(message: &str, user: &str, rtd: &Rtd, check_authorization: impl Fn() -> Result<()>) -> Result<Vec<Result<String>>> {
+    Ok(match message {
+        "!help" => {
+            vec![get_help()]
+        },
+        "!status" => {
+            vec![get_status(rtd)]
+        },
+        "!stopscripts" => {
+            check_authorization()?;
+            vec![stop_scripts()]
+        },
+        "!contscripts" => {
+            check_authorization()?;
+            vec![cont_scripts()]
+        },
+        msg if msg.starts_with("!s ") => {
+            let url = msg.split(' ').take(2).last().unwrap();
+            let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
+            vec![check_stash(&descriptor)]
+        },
+        msg if msg.starts_with("!a ") => {
+            check_authorization()?;
+            let url = msg.split(' ').take(2).last().unwrap();
+            let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
+            vec![archive(&descriptor, VideoSize::Normal, &user, &rtd)]
+        },
+        msg if msg.starts_with("!sa ") => {
+            check_authorization()?;
+            let url = msg.split(' ').take(2).last().unwrap();
+            let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
+            vec![
+                check_stash(&descriptor),
+                archive(&descriptor, VideoSize::Normal, &user, &rtd)
+            ]
+        },
+        msg if msg.starts_with("!averybig ") => {
+            check_authorization()?;
+            let url = msg.split(' ').take(2).last().unwrap();
+            let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
+            vec![archive(&descriptor, VideoSize::VeryBig, &user, &rtd)]
+        },
+        msg if msg.starts_with("!saverybig ") => {
+            check_authorization()?;
+            let url = msg.split(' ').take(2).last().unwrap();
+            let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
+            vec![
+                check_stash(&descriptor),
+                archive(&descriptor, VideoSize::VeryBig, &user, &rtd)
+            ]
+        },
+        msg if msg.starts_with("!abort ") => {
+            check_authorization()?;
+            let task = msg.split(' ').take(2).last().unwrap();
+            vec![abort(&task)]
+        },
+        _other => vec![],
+    })
+}
+
+const NO_WEBCHAT_MESSAGE: &'static str =
+    "webchat users are not authorized; use any other IRC client, or ask someone else to do it";
 
 pub fn handle_message(client: &IrcClient, message: &Message, rtd: &Rtd) -> Result<()> {
     // print the message if debug flag is set
@@ -385,7 +450,7 @@ pub fn handle_message(client: &IrcClient, message: &Message, rtd: &Rtd) -> Resul
     let check_authorization = || {
         if let Some(prefix) = &message.prefix {
             if WEBCHAT_RE.is_match(prefix) {
-                send_reply(client, channel, user, Ok("webchat users are not authorized; use any other IRC client, or ask someone else to do it".into()));
+                send_reply(client, channel, user, Ok(NO_WEBCHAT_MESSAGE.into()));
                 return Err(Error::NotAuthorized);
             }
         }
@@ -393,58 +458,16 @@ pub fn handle_message(client: &IrcClient, message: &Message, rtd: &Rtd) -> Resul
     };
 
     if message.response_target() == Some(channel) {
-        match msg.as_ref() {
-            "!help" => {
-                client.send_privmsg(channel, get_help()).unwrap()
+        let replies = dispatch_message(&msg, &user, &rtd, &check_authorization);
+        match replies {
+            Err(err) => {
+                client.send_privmsg(channel, format!("{}: error: {}", user, err)).unwrap()
             },
-            "!status" => {
-                send_reply(client, channel, user, get_status(rtd));
-            },
-            "!stopscripts" => {
-                check_authorization()?;
-                send_reply(client, channel, user, stop_scripts());
-            },
-            "!contscripts" => {
-                check_authorization()?;
-                send_reply(client, channel, user, cont_scripts());
-            },
-            msg if msg.starts_with("!s ") => {
-                let url = msg.split(' ').take(2).last().unwrap();
-                let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
-                send_reply(client, channel, user, check_stash(&descriptor));
-            },
-            msg if msg.starts_with("!a ") => {
-                check_authorization()?;
-                let url = msg.split(' ').take(2).last().unwrap();
-                let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
-                send_reply(client, channel, user, archive(&descriptor, VideoSize::Normal, &user, &rtd));
-            },
-            msg if msg.starts_with("!sa ") => {
-                check_authorization()?;
-                let url = msg.split(' ').take(2).last().unwrap();
-                let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
-                send_reply(client, channel, user, check_stash(&descriptor));
-                send_reply(client, channel, user, archive(&descriptor, VideoSize::Normal, &user, &rtd));
-            },
-            msg if msg.starts_with("!averybig ") => {
-                check_authorization()?;
-                let url = msg.split(' ').take(2).last().unwrap();
-                let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
-                send_reply(client, channel, user, archive(&descriptor, VideoSize::VeryBig, &user, &rtd));
-            },
-            msg if msg.starts_with("!saverybig ") => {
-                check_authorization()?;
-                let url = msg.split(' ').take(2).last().unwrap();
-                let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
-                send_reply(client, channel, user, check_stash(&descriptor));
-                send_reply(client, channel, user, archive(&descriptor, VideoSize::VeryBig, &user, &rtd));
-            },
-            msg if msg.starts_with("!abort ") => {
-                check_authorization()?;
-                let task = msg.split(' ').take(2).last().unwrap();
-                send_reply(client, channel, user, abort(&task));
-            },
-            _other => {},
+            Ok(replies) => {
+                for reply in replies.into_iter() {
+                    send_reply(client, channel, user, reply);
+                }
+            }
         }
     }
     Ok(())
