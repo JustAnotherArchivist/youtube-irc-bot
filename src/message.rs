@@ -34,18 +34,6 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[allow(clippy::let_and_return)]
-fn fix_youtube_url(url: &str) -> String {
-    let url = url.replace("http://", "https://");
-    let url = url.replace("https://m.youtube.com/", "https://www.youtube.com/");
-    let url = url.replace("https://youtube.com/", "https://www.youtube.com/");
-    let url = url.replace("https://youtu.be/", "https://www.youtube.com/watch?v=");
-    // Fix annoying links that fail to load on mobile
-    let url = url.replace("?disable_polymer=1", "");
-    let url = url.replace("&disable_polymer=1", "");
-    url
-}
-
 fn contents_for_url(url: &str) -> Result<String> {
     let output = process::Command::new("get-youtube-page").arg(&url).output().context(Io)?;
     let body = str::from_utf8(&output.stdout).context(Utf8)?;
@@ -108,9 +96,21 @@ impl CanonicalizedYoutubeDescriptor {
     }
 }
 
+#[allow(clippy::let_and_return)]
+fn fix_youtube_url(url: &str) -> String {
+    let url = url.replace("http://", "https://");
+    let url = url.replace("https://m.youtube.com/", "https://www.youtube.com/");
+    let url = url.replace("https://youtube.com/", "https://www.youtube.com/");
+    let url = url.replace("https://youtu.be/", "https://www.youtube.com/watch?v=");
+    // Fix annoying links that fail to load on mobile
+    let url = url.replace("?disable_polymer=1", "");
+    let url = url.replace("&disable_polymer=1", "");
+    url
+}
+
 // Map of username -> folder for channels for which we do not want to store
 // videos in the folder `username`
-static USERNAME_EXCEPTIONS: Map<&'static str, &'static str> = phf_map! {
+static FOLDER_EXCEPTIONS: Map<&'static str, &'static str> = phf_map! {
     "TEDxTalks" => "UCsT0YIqwnpJCM-mx7-gSA4Q",
 };
 
@@ -184,7 +184,7 @@ impl YoutubeDescriptor {
                     }
                     Some(username) => {
                         let mut folder = username.clone();
-                        if let Some(custom_folder) = USERNAME_EXCEPTIONS.get(username.as_str()) {
+                        if let Some(custom_folder) = FOLDER_EXCEPTIONS.get(username.as_str()) {
                             folder = custom_folder.to_string();
                         }
                         CanonicalizedYoutubeDescriptor { kind: FetchType::User, id: username.clone(), folder }
@@ -218,7 +218,6 @@ fn archive(url: &str, video_size: VideoSize, user: &str, rtd: &Rtd) -> Result<St
         },
         FetchType::Channel | FetchType::User | FetchType::Playlist => {
             let folder = descriptor.folder();
-            make_folder(&folder)?;
             let url = descriptor.to_url();
             let sessions = get_downloader_sessions()?;
             if let Some(_session) = sessions.iter().find(|session| session.identifier == folder) {
@@ -244,6 +243,14 @@ fn archive(url: &str, video_size: VideoSize, user: &str, rtd: &Rtd) -> Result<St
     }
 }
 
+fn assert_valid_task_name(task: &str) -> Result<()> {
+    lazy_static! {
+        static ref TASK_NAME_RE: Regex = Regex::new(r"\A[-_A-Za-z0-9]+\z").unwrap();
+    }
+    ensure!(TASK_NAME_RE.is_match(task), InvalidTaskName { task });
+    Ok(())
+}
+
 fn abort(task: &str) -> Result<String> {
     assert_valid_task_name(task)?;
     let session = format!("YouTube-{}", task);
@@ -254,34 +261,12 @@ fn abort(task: &str) -> Result<String> {
     Ok(format!("Aborted {}", &task))
 }
 
-fn assert_valid_task_name(task: &str) -> Result<()> {
-    lazy_static! {
-        static ref TASK_NAME_RE: Regex = Regex::new(r"\A[-_A-Za-z0-9]+\z").unwrap();
-    }
-    ensure!(TASK_NAME_RE.is_match(task), InvalidTaskName { task });
-    Ok(())
-}
-
 fn limit_for_user(user: &str, rtd: &Rtd) -> usize {
     let user_limits = &rtd.conf.user_limits;
     match user_limits.get(user) {
         None         => rtd.conf.params.task_limit,
         Some(&limit) => limit
     }
-}
-
-fn make_folder(folder: &str) -> Result<()> {
-    let home    = dirs::home_dir().unwrap();
-    let youtube = home.as_path().join("YouTube");
-    let output  = process::Command::new("timeout")
-        .current_dir(youtube)
-        .arg("-k").arg("2m").arg("1m")
-        .arg("ts").arg("mkdir").arg(folder)
-        .output()
-        .context(Io)?;
-    let stdout_utf8 = str::from_utf8(&output.stdout).context(Utf8)?;
-    ensure!(stdout_utf8 == "", ErrorCreatingFolder { folder });
-    Ok(())
 }
 
 fn check_stash(url: &str) -> Result<String> {
@@ -369,9 +354,11 @@ fn get_help() -> String {
     "Usage: \
     !help | \
     !status | \
-    !a <user or channel or watch URL> | \
-    !averybig <user or channel or watch URL with very large videos> | \
-    !s <user or channel URL> | \
+    !s <URL> | \
+    !a <URL> | \
+    !sa <user or channel or watch URL> | \
+    !averybig <URL w/ very large videos> | \
+    !saverybig <URL w/ very large videos> | \
     !abort <task> | \
     !stopscripts | \
     !contscripts".to_string()
