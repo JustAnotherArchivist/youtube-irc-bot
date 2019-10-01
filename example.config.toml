@@ -1,6 +1,4 @@
 [features]
-report_metadata = false
-report_mime = false
 mask_highlights = false
 send_notice = false
 

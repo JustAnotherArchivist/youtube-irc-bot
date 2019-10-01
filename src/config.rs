@@ -36,8 +36,6 @@ pub struct Conf {
 #[derive(Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Features {
-    pub report_metadata: bool,
-    pub report_mime: bool,
     pub mask_highlights: bool,
     pub send_notice: bool,
 }
