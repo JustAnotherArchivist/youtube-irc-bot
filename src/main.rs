@@ -1,34 +1,39 @@
 extern crate youtube_irc_bot;
 
-use docopt::Docopt;
 use irc::client::prelude::*;
 use std::process;
+use std::path::PathBuf;
+use structopt::StructOpt;
 
 use youtube_irc_bot::config::Rtd;
 use youtube_irc_bot::config::Args;
 use youtube_irc_bot::message::handle_message;
 
-// docopt usage string
-const USAGE: &str = "
-Helpful IRC bot.
+#[derive(StructOpt, Debug)]
+#[structopt(name = "youtube-irc-bot")]
+/// IRC bot for ingesting URLs to archive
+struct Opt {
+    /// Show extra information
+    #[structopt(short = "v", long)]
+    verbose: bool,
 
-Usage:
-    youtube-irc-bot [options]
+    /// Print debugging information
+    #[structopt(short = "D", long)]
+    debug: bool,
 
-Options:
-    -h --help       Show this help message.
-    -v --verbose    Show extra information.
-    -D --debug      Print debugging information.
-    -c --conf=PATH  Use configuration file at PATH.
-";
+    /// File to read configuration from
+    #[structopt(short = "c", long, parse(from_os_str))]
+    conf: Option<PathBuf>,
+}
 
 fn main() {
-    // parse command line arguments with docopt
-    let args: Args = Docopt::new(USAGE)
-        .unwrap()
+    let opt = Opt::from_args();
 
-        .deserialize()
-        .unwrap_or_else(|e| e.exit());
+    let args = Args {
+        flag_verbose: opt.verbose,
+        flag_debug: opt.debug,
+        flag_conf: opt.conf
+    };
 
     // get a run-time configuration data structure
     let rtd: Rtd = Rtd::from_args(args).unwrap_or_else(|err| {
