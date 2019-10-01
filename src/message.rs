@@ -20,12 +20,8 @@ pub enum Error {
     UnsupportedUrl { url: String },
     #[snafu(display("Not authorized"))]
     NotAuthorized,
-    #[snafu(display("Could not get folder for URL {}", url))]
-    CouldNotGetFolder { url: String },
     #[snafu(display("Could not get channel identifier"))]
     CouldNotGetChannelIdentifier,
-    #[snafu(display("Could not make a YouTube descriptor from URL {}", url))]
-    CouldNotMakeYoutubeDescriptor { url: String },
     #[snafu(display("Invalid task name: {}", task))]
     InvalidTaskName { task: String },
     #[snafu(display("Not implemented: {}", what))]
@@ -34,10 +30,6 @@ pub enum Error {
     ErrorListingFiles { folder: String },
     #[snafu(display("Internal error creating folder {}", folder))]
     ErrorCreatingFolder { folder: String },
-    #[snafu(display("Channel ID in page {:?} does not match provided channel ID {:?}", page_channel_id, provided_channel_id))]
-    PageChannelIdDoesNotMatch { page_channel_id: String, provided_channel_id: String },
-    #[snafu(display("Body for {:?} was expected to have a username but does not", url))]
-    PageDoesNotHaveUsername { url: String },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
