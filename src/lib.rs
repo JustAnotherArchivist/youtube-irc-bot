@@ -14,7 +14,6 @@ extern crate toml;
 extern crate directories;
 extern crate url;
 
-pub mod http;
 pub mod config;
 pub mod message;
-pub mod error;
+pub mod duration;
