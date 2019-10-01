@@ -426,7 +426,7 @@ pub fn dispatch_message(message: &str, user: &str, rtd: &Rtd, check_authorizatio
     })
 }
 
-const NO_WEBCHAT_MESSAGE: &'static str =
+const NO_WEBCHAT_MESSAGE: &str =
     "webchat users are not authorized; use any other IRC client, or ask someone else to do it";
 
 pub fn handle_message(client: &IrcClient, message: &Message, rtd: &Rtd) -> Result<()> {
