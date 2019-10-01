@@ -471,70 +471,20 @@ mod tests {
 
     #[test]
     fn test_descriptor() {
-        assert_eq!(YoutubeDescriptor::from_url("https://www.youtube.com/channel/UChBBWt5H8uZW1LSOh_aPt2Q/videos").unwrap(), YoutubeDescriptor::Channel("UChBBWt5H8uZW1LSOh_aPt2Q".to_string()));
-        assert_eq!(YoutubeDescriptor::from_url("https://www.youtube.com/user/jblow888/videos").unwrap(), YoutubeDescriptor::User("jblow888".to_string()));
-        assert_eq!(YoutubeDescriptor::from_url("https://www.youtube.com/playlist?list=PL5AC656794EE191C1").unwrap(), YoutubeDescriptor::Playlist("PL5AC656794EE191C1".to_string()));
-        assert_eq!(YoutubeDescriptor::from_url("https://www.youtube.com/playlist?list=PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF").unwrap(), YoutubeDescriptor::Playlist("PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF".to_string()));
-        assert_eq!(YoutubeDescriptor::from_url("https://www.youtube.com/watch?v=YdSdvIRkkDY").unwrap(), YoutubeDescriptor::Video("YdSdvIRkkDY".to_string()));
+        assert_eq!(
+            YoutubeDescriptor::from_url("https://www.youtube.com/channel/UChBBWt5H8uZW1LSOh_aPt2Q/videos").unwrap(),
+            YoutubeDescriptor::Channel("UChBBWt5H8uZW1LSOh_aPt2Q".to_string()));
+        assert_eq!(
+            YoutubeDescriptor::from_url("https://www.youtube.com/user/jblow888/videos").unwrap(),
+            YoutubeDescriptor::User("jblow888".to_string()));
+        assert_eq!(
+            YoutubeDescriptor::from_url("https://www.youtube.com/playlist?list=PL5AC656794EE191C1").unwrap(),
+            YoutubeDescriptor::Playlist("PL5AC656794EE191C1".to_string()));
+        assert_eq!(
+            YoutubeDescriptor::from_url("https://www.youtube.com/playlist?list=PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF").unwrap(),
+            YoutubeDescriptor::Playlist("PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF".to_string()));
+        assert_eq!(
+            YoutubeDescriptor::from_url("https://www.youtube.com/watch?v=YdSdvIRkkDY").unwrap(),
+            YoutubeDescriptor::Video("YdSdvIRkkDY".to_string()));
     }
-
-//    #[test]
-//    fn test_folder_for_url() {
-//        assert_eq!(folder_for_url("https://www.youtube.com/channel/UChBBWt5H8uZW1LSOh_aPt2Q/videos"), "UChBBWt5H8uZW1LSOh_aPt2Q");
-//        assert_eq!(folder_for_url("https://www.youtube.com/user/jblow888/videos"), "jblow888");
-//        assert_eq!(folder_for_url("https://www.youtube.com/playlist?list=PL5AC656794EE191C1"), "PL5AC656794EE191C1");
-//        assert_eq!(folder_for_url("https://www.youtube.com/playlist?list=PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF"), "PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF");
-//    }
-//
-//    #[test]
-//    fn test_get_canonical_url() {
-//        // Playlist is playlist if it exists
-//        assert_eq!(
-//            get_canonical_url("https://www.youtube.com/playlist?list=PL5AC656794EE191C1").unwrap(),
-//            Some("https://www.youtube.com/playlist?list=PL5AC656794EE191C1")
-//        );
-//        assert_eq!(
-//            get_canonical_url("https://www.youtube.com/playlist?list=PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF").unwrap(),
-//            Some("https://www.youtube.com/playlist?list=PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF")
-//        );
-//        // Playlist is None if it doesn't exist
-//        assert_eq!(
-//            get_canonical_url("https://www.youtube.com/playlist?list=PL78L-9twndz8fMRU3NpiWSmB5IucqWuTa").unwrap(),
-//            None
-//        );
-//        // User is user if it exists
-//        assert_eq!(
-//            get_canonical_url("https://www.youtube.com/user/jblow888/videos").unwrap(),
-//            Some("https://www.youtube.com/user/jblow888/videos")
-//        );
-//        // User is always converted to canonical case
-//        assert_eq!(
-//            get_canonical_url("https://www.youtube.com/user/JBlow888/videos").unwrap(),
-//            Some("https://www.youtube.com/user/jblow888/videos")
-//        );
-//        assert_eq!(
-//            get_canonical_url("https://www.youtube.com/user/cnn/videos").unwrap(),
-//            Some("https://www.youtube.com/user/CNN/videos")
-//        );
-//        // User is None if it doesn't exist
-//        assert_eq!(
-//            get_canonical_url("https://www.youtube.com/user/jblow8888/videos").unwrap(),
-//            None
-//        );
-//        // Channel is channel if it exists and has no username
-//        assert_eq!(
-//            get_canonical_url("https://www.youtube.com/channel/UChBBWt5H8uZW1LSOh_aPt2Q/videos").unwrap(),
-//            Some("https://www.youtube.com/channel/UChBBWt5H8uZW1LSOh_aPt2Q/videos")
-//        );
-//        // Channel is user if it exists and has a username
-//        assert_eq!(
-//            get_canonical_url("https://www.youtube.com/channel/UCupvZG-5ko_eiXAupbDfxWw").unwrap(),
-//            Some("https://www.youtube.com/user/CNN/videos")
-//        );
-//        // Channel is None if it doesn't exist
-//        assert_eq!(
-//            get_canonical_url("https://www.youtube.com/channel/UChBBWt5H8uZW1LSOh_aPt2a/videos").unwrap(),
-//            None
-//        );
-//    }
 }
