@@ -1468,7 +1468,6 @@ dependencies = [
  "directories 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "dirs 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "docopt 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "humansize 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "irc 0.13.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",

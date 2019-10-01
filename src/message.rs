@@ -13,7 +13,10 @@ enum VideoSize {
 }
 
 #[derive(Debug, Snafu)]
+#[snafu(visibility = "pub(crate)")]
 pub enum Error {
+    TomlEncode { source: toml::ser::Error },
+    TomlDecode { source: toml::de::Error },
     Io { source: std::io::Error, backtrace: Backtrace },
     Utf8 { source: std::str::Utf8Error, backtrace: Backtrace },
     #[snafu(display("Unsupported URL: {}", url))]
@@ -32,7 +35,7 @@ pub enum Error {
     ErrorCreatingFolder { folder: String },
 }
 
-type Result<T, E = Error> = std::result::Result<T, E>;
+pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
 fn contents_for_url(url: &str) -> Result<String> {
     let output = process::Command::new("get-youtube-page").arg(&url).output().context(Io)?;

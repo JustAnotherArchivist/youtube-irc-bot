@@ -9,9 +9,10 @@ use std::collections::HashMap;
 use toml;
 use std::path::{Path, PathBuf};
 use irc::client::data::Config as IrcConfig;
-use failure::Error;
 use std::fmt;
 use directories::{ProjectDirs, BaseDirs};
+use snafu::ResultExt;
+use crate::message::{Result, TomlEncode, TomlDecode, Io};
 
 #[derive(Debug, Deserialize, Default)]
 pub struct Args {
@@ -59,16 +60,16 @@ impl Default for Parameters {
 
 impl Conf {
     // load configuration TOML from a file
-    pub fn load(path: impl AsRef<Path>) -> Result<Self, Error> {
-        let conf = fs::read_to_string(path.as_ref())?;
-        let conf: Conf = toml::de::from_str(&conf)?;
+    pub fn load(path: impl AsRef<Path>) -> Result<Self> {
+        let conf = fs::read_to_string(path.as_ref()).context(Io)?;
+        let conf: Conf = toml::de::from_str(&conf).context(TomlDecode)?;
         Ok(conf)
     }
 
     // write configuration to a file
-    pub fn write(self, path: impl AsRef<Path>) -> Result<(), Error> {
-        let mut file = File::create(path)?;
-        file.write_all(toml::ser::to_string(&self)?.as_bytes())?;
+    pub fn write(self, path: impl AsRef<Path>) -> Result<()> {
+        let mut file = File::create(path).context(Io)?;
+        file.write_all(toml::ser::to_string(&self).context(TomlEncode)?.as_bytes()).context(Io)?;
         Ok(())
     }
 }
@@ -124,7 +125,7 @@ pub struct Paths {
 }
 
 impl Rtd {
-    pub fn from_args(args: Args) -> Result<Self, Error> {
+    pub fn from_args(args: Args) -> Result<Self> {
         let mut rtd = Rtd::default();
 
         // move command line arguments
@@ -173,12 +174,12 @@ macro_rules! impl_display {
 }
 impl_display!(Features, Parameters);
 
-fn create_dir_if_missing(dir: &Path) -> Result<bool, Error> {
+fn create_dir_if_missing(dir: &Path) -> Result<bool> {
     let pdir = dir.to_str().unwrap();
     let exists = pdir.is_empty() || dir.exists();
     if !exists {
         eprintln!("Directory `{}` doesn't exist, creating it", pdir);
-        fs::create_dir_all(dir)?;
+        fs::create_dir_all(dir).context(Io)?;
     }
     Ok(exists)
 }
