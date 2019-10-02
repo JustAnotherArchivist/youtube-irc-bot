@@ -11,6 +11,8 @@ use youtube_irc_bot::message::handle_message;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "youtube-irc-bot")]
+#[structopt(help_message = "Print help information")]
+#[structopt(version_message = "Print version information")]
 /// IRC bot for ingesting URLs to archive
 struct Opt {
     /// Show extra information
