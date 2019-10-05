@@ -198,12 +198,11 @@ impl YoutubeDescriptor {
     }
 }
 
-fn archive(descriptor: &CanonicalizedYoutubeDescriptor, video_size: VideoSize, user: &str, rtd: &Rtd) -> Result<String> {
+fn archive(original_url: &str, descriptor: &CanonicalizedYoutubeDescriptor, video_size: VideoSize, user: &str, rtd: &Rtd) -> Result<String> {
     let folder = descriptor.folder();
-    let url = descriptor.to_url();
     let sessions = get_downloader_sessions()?;
     if let Some(_session) = sessions.iter().find(|session| session.identifier == folder) {
-        return Ok(format!("Can't archive {} because another task is running in the same folder {}", &url, &folder));
+        return Ok(format!("Can't archive {} because another task is running in the same folder {}", &original_url, &folder));
     }
     match descriptor.kind {
         FetchType::Video => {
@@ -212,7 +211,7 @@ fn archive(descriptor: &CanonicalizedYoutubeDescriptor, video_size: VideoSize, u
                 VideoSize::VeryBig => "grab-youtube-video-big-video"
             };
             let output = process::Command::new(command)
-                .arg(&folder).arg(&url)
+                .arg(&folder).arg(&descriptor.to_url())
                 .output()
                 .context(Io)?;
             let _ = str::from_utf8(&output.stdout).context(Utf8)?;
@@ -220,7 +219,7 @@ fn archive(descriptor: &CanonicalizedYoutubeDescriptor, video_size: VideoSize, u
         FetchType::Channel | FetchType::User | FetchType::Playlist => {
             let tasks_limit = limit_for_user(user, rtd);
             if sessions.len() >= tasks_limit {
-                return Ok(format!("Can't archive {} because too many tasks are running (your limit = {}), try again later", &url, tasks_limit));
+                return Ok(format!("Can't archive {} because too many tasks are running (your limit = {}), try again later", &original_url, tasks_limit));
             }
             let videos_limit = 999_999;
             let command = match video_size {
@@ -234,7 +233,7 @@ fn archive(descriptor: &CanonicalizedYoutubeDescriptor, video_size: VideoSize, u
             let _ = str::from_utf8(&output.stdout).context(Utf8)?;
         }
     }
-    Ok(format!("Grabbing {} -> {}; check https://ya.borg.xyz/logs/dl/{}/ later", &url, &folder, &folder))
+    Ok(format!("Grabbing {} -> {}; check https://ya.borg.xyz/logs/dl/{}/ later", &original_url, &folder, &folder))
 }
 
 fn assert_valid_task_name(task: &str) -> Result<()> {
@@ -391,7 +390,7 @@ pub fn dispatch_message(message: &str, user: &str, rtd: &Rtd, check_authorizatio
             check_authorization()?;
             let url = msg.split(' ').take(2).last().unwrap();
             let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
-            vec![archive(&descriptor, VideoSize::Normal, &user, &rtd)]
+            vec![archive(&url, &descriptor, VideoSize::Normal, &user, &rtd)]
         },
         msg if msg.starts_with("!sa ") => {
             check_authorization()?;
@@ -399,14 +398,14 @@ pub fn dispatch_message(message: &str, user: &str, rtd: &Rtd, check_authorizatio
             let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
             vec![
                 check_stash(&descriptor),
-                archive(&descriptor, VideoSize::Normal, &user, &rtd)
+                archive(&url, &descriptor, VideoSize::Normal, &user, &rtd)
             ]
         },
         msg if msg.starts_with("!averybig ") => {
             check_authorization()?;
             let url = msg.split(' ').take(2).last().unwrap();
             let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
-            vec![archive(&descriptor, VideoSize::VeryBig, &user, &rtd)]
+            vec![archive(&url, &descriptor, VideoSize::VeryBig, &user, &rtd)]
         },
         msg if msg.starts_with("!saverybig ") => {
             check_authorization()?;
@@ -414,7 +413,7 @@ pub fn dispatch_message(message: &str, user: &str, rtd: &Rtd, check_authorizatio
             let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
             vec![
                 check_stash(&descriptor),
-                archive(&descriptor, VideoSize::VeryBig, &user, &rtd)
+                archive(&url, &descriptor, VideoSize::VeryBig, &user, &rtd)
             ]
         },
         msg if msg.starts_with("!abort ") => {
