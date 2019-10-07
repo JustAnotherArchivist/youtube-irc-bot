@@ -262,13 +262,10 @@ fn limit_for_user(user: &str, rtd: &Rtd) -> usize {
     }
 }
 
-fn check_stash(descriptor: &CanonicalizedYoutubeDescriptor) -> Result<String> {
-    if descriptor.kind == FetchType::Video {
-        return Err(Error::NotImplemented { what: "/s on /watch? URL".into() });
-    }
-    let folder = descriptor.folder();
+fn check_folder(folder: &str) -> Result<String> {
+    assert_valid_task_name(folder)?;
     let listing = match get_file_listing(&folder) {
-        Err(_) => return Err(Error::ErrorListingFiles { folder }),
+        Err(_) => return Err(Error::ErrorListingFiles { folder: folder.to_string() }),
         Ok(files) => files,
     };
     let videos = listing
@@ -284,6 +281,14 @@ fn check_stash(descriptor: &CanonicalizedYoutubeDescriptor) -> Result<String> {
         .collect::<Vec<String>>();
     let latest_videos = videos.iter().take(4).collect::<Vec<_>>();
     Ok(format!("stash has {} videos for {}, latest {:?}", videos.len(), &folder, latest_videos))
+}
+
+fn check_stash(descriptor: &CanonicalizedYoutubeDescriptor) -> Result<String> {
+    if descriptor.kind == FetchType::Video {
+        return Err(Error::NotImplemented { what: "/s on /watch? URL".into() });
+    }
+    let folder = descriptor.folder();
+    check_folder(&folder)
 }
 
 fn get_file_listing(folder: &str) -> Result<Vec<String>> {
@@ -347,7 +352,7 @@ fn get_help() -> Result<String> {
         "Usage: \
         !help | \
         !status | \
-        !s <URL> | \
+        !s <URL or folder> | \
         !a <URL> | \
         !sa <URL> | \
         !averybig <URL w/ very large videos> | \
@@ -382,9 +387,13 @@ pub fn dispatch_message(message: &str, user: &str, rtd: &Rtd, check_authorizatio
             vec![cont_scripts()]
         },
         msg if msg.starts_with("!s ") => {
-            let url = msg.split(' ').take(2).last().unwrap();
-            let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
-            vec![check_stash(&descriptor)]
+            let url_or_folder = msg.split(' ').take(2).last().unwrap();
+            if url_or_folder.starts_with("https://") || url_or_folder.starts_with("http://") {
+                let descriptor = YoutubeDescriptor::from_url(&url_or_folder)?.canonicalize()?;
+                vec![check_stash(&descriptor)]
+            } else {
+                vec![check_folder(&url_or_folder)]
+            }
         },
         msg if msg.starts_with("!a ") => {
             check_authorization()?;
