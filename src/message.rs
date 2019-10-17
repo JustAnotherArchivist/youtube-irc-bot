@@ -1,6 +1,7 @@
 use irc::client::prelude::*;
 use std::str;
 use std::process;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::{ensure, ResultExt, Snafu, Backtrace};
 use ::phf::{Map, phf_map};
@@ -44,18 +45,14 @@ fn contents_for_url(url: &str) -> Result<String> {
 }
 
 fn extract_username(page_contents: &str) -> Option<String> {
-    lazy_static! {
-        static ref RE: Regex = Regex::new(r#"<link itemprop="url" href="http://www.youtube.com/user/([^"]+)">"#).unwrap();
-    }
-    let user = RE.captures(page_contents)?.get(1)?.as_str();
+    static USER_RE: &Lazy<Regex> = lazy_regex!(r#"<link itemprop="url" href="http://www.youtube.com/user/([^"]+)">"#);
+    let user = USER_RE.captures(page_contents)?.get(1)?.as_str();
     Some(user.to_string())
 }
 
 fn extract_channel_id(page_contents: &str) -> Result<String> {
-    lazy_static! {
-        static ref CHANNEL_META_RE:          Regex = Regex::new(r#"<meta itemprop="channelId" content="([^"]+)">"#).unwrap();
-        static ref CHANNEL_VIDEO_DETAILS_RE: Regex = Regex::new(r#" ytplayer = .+?\\"channelId\\":\\"([^"]+)\\""#).unwrap();
-    }
+    static CHANNEL_META_RE: &Lazy<Regex> = lazy_regex!(r#"<meta itemprop="channelId" content="([^"]+)">"#);
+    static CHANNEL_VIDEO_DETAILS_RE: &Lazy<Regex> = lazy_regex!(r#" ytplayer = .+?\\"channelId\\":\\"([^"]+)\\""#);
     match &CHANNEL_META_RE.captures(page_contents) {
         Some(captures) if captures.len() >= 1 => {
             Ok(captures.get(1).unwrap().as_str().to_owned())
@@ -127,13 +124,11 @@ pub enum YoutubeDescriptor {
 
 impl YoutubeDescriptor {
     pub fn from_url(url: &str) -> Result<YoutubeDescriptor> {
-        lazy_static! {
-            static ref OLD_PLAYLIST_RE: Regex = Regex::new(r#"https://www.youtube.com/playlist\?list=(PL[0-9A-F]{16})"#).unwrap();
-            static ref NEW_PLAYLIST_RE: Regex = Regex::new(r#"https://www.youtube.com/playlist\?list=(PL[-_A-Za-z0-9]{32})"#).unwrap();
-            static ref WATCH_RE:        Regex = Regex::new(r#"https://www.youtube.com/watch\?v=([-_A-Za-z0-9]{11})"#).unwrap();
-            static ref CHANNEL_RE:      Regex = Regex::new(r#"https://www.youtube.com/channel/(UC[-_A-Za-z0-9]{22})"#).unwrap();
-            static ref USER_RE:         Regex = Regex::new(r#"https://www.youtube.com/user/([A-Za-z0-9]{1,20})"#).unwrap();
-        }
+        static OLD_PLAYLIST_RE: &Lazy<Regex> = lazy_regex!(r#"https://www.youtube.com/playlist\?list=(PL[0-9A-F]{16})"#);
+        static NEW_PLAYLIST_RE: &Lazy<Regex> = lazy_regex!(r#"https://www.youtube.com/playlist\?list=(PL[-_A-Za-z0-9]{32})"#);
+        static WATCH_RE:        &Lazy<Regex> = lazy_regex!(r#"https://www.youtube.com/watch\?v=([-_A-Za-z0-9]{11})"#);
+        static CHANNEL_RE:      &Lazy<Regex> = lazy_regex!(r#"https://www.youtube.com/channel/(UC[-_A-Za-z0-9]{22})"#);
+        static USER_RE:         &Lazy<Regex> = lazy_regex!(r#"https://www.youtube.com/user/([A-Za-z0-9]{1,20})"#);
 
         let url = fix_youtube_url(url);
         ensure!(url.starts_with("https://www.youtube.com/"), UnsupportedUrl { url });
@@ -237,9 +232,7 @@ fn archive(original_url: &str, descriptor: &CanonicalizedYoutubeDescriptor, vide
 }
 
 fn assert_valid_task_name(task: &str) -> Result<()> {
-    lazy_static! {
-        static ref TASK_NAME_RE: Regex = Regex::new(r"\A[-_A-Za-z0-9]+\z").unwrap();
-    }
+    static TASK_NAME_RE: &Lazy<Regex> = lazy_regex!(r"\A[-_A-Za-z0-9]+\z");
     ensure!(TASK_NAME_RE.is_match(task), InvalidTaskName { task });
     Ok(())
 }
@@ -452,9 +445,7 @@ pub fn handle_message(client: &IrcClient, message: &Message, rtd: &Rtd) -> Resul
     let user = message.source_nickname().unwrap();
     let channel = &rtd.conf.params.command_channel;
 
-    lazy_static! {
-        static ref WEBCHAT_RE: Regex = Regex::new(r"\A.+!webchat@.+\z").unwrap();
-    }
+    static WEBCHAT_RE: &Lazy<Regex> = lazy_regex!(r"\A.+!webchat@.+\z");
     let check_authorization = || {
         if let Some(prefix) = &message.prefix {
             if WEBCHAT_RE.is_match(prefix) {
