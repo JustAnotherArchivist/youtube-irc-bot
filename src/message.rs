@@ -183,14 +183,14 @@ impl YoutubeDescriptor {
                 match username {
                     None => {
                         let channel_id = extract_channel_id(&contents)?;
-                        CanonicalizedYoutubeDescriptor { kind: FetchType::Channel, id: channel_id.clone(), folder: channel_id.clone() }
+                        CanonicalizedYoutubeDescriptor { kind: FetchType::Channel, id: channel_id.clone(), folder: channel_id }
                     }
                     Some(username) => {
                         let mut folder = username.clone();
                         if let Some(custom_folder) = FOLDER_EXCEPTIONS.get(username.as_str()) {
                             folder = custom_folder.to_string();
                         }
-                        CanonicalizedYoutubeDescriptor { kind: FetchType::User, id: username.clone(), folder }
+                        CanonicalizedYoutubeDescriptor { kind: FetchType::User, id: username, folder }
                     }
                 }
             },
