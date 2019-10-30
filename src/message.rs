@@ -20,6 +20,7 @@ pub enum Error {
     TomlDecode { source: toml::de::Error },
     Io { source: std::io::Error, backtrace: Backtrace },
     Utf8 { source: std::str::Utf8Error, backtrace: Backtrace },
+    UrlTooLong,
     #[snafu(display("Unsupported URL: {}", url))]
     UnsupportedUrl { url: String },
     #[snafu(display("Not authorized"))]
@@ -124,22 +125,22 @@ pub enum YoutubeDescriptor {
 
 impl YoutubeDescriptor {
     pub fn from_url(url: &str) -> Result<YoutubeDescriptor> {
-        static OLD_PLAYLIST_RE: &Lazy<Regex> = lazy_regex!(r#"https://www.youtube.com/playlist\?list=(PL[0-9A-F]{16})"#);
-        static NEW_PLAYLIST_RE: &Lazy<Regex> = lazy_regex!(r#"https://www.youtube.com/playlist\?list=(PL[-_A-Za-z0-9]{32})"#);
-        static WATCH_RE:        &Lazy<Regex> = lazy_regex!(r#"https://www.youtube.com/watch\?v=([-_A-Za-z0-9]{11})"#);
-        static CHANNEL_RE:      &Lazy<Regex> = lazy_regex!(r#"https://www.youtube.com/channel/(UC[-_A-Za-z0-9]{22})"#);
-        static USER_RE:         &Lazy<Regex> = lazy_regex!(r#"https://www.youtube.com/user/([A-Za-z0-9]{1,20})"#);
+        static WATCH_RE:        &Lazy<Regex> = lazy_regex!(r#"\Ahttps://www.youtube.com/watch.*[\?&]v=([-_A-Za-z0-9]{11})([#\&].*)?\z"#);
+        static OLD_PLAYLIST_RE: &Lazy<Regex> = lazy_regex!(r#"\Ahttps://www.youtube.com/playlist.*[\?&]list=(PL[0-9A-F]{16})([#\&].*)?\z"#);
+        static NEW_PLAYLIST_RE: &Lazy<Regex> = lazy_regex!(r#"\Ahttps://www.youtube.com/playlist.*[\?&]list=(PL[-_A-Za-z0-9]{32})([#\&].*)?\z"#);
+        static CHANNEL_RE:      &Lazy<Regex> = lazy_regex!(r#"\Ahttps://www.youtube.com/channel/(UC[-_A-Za-z0-9]{22})([/#\?].*)?\z"#);
+        static USER_RE:         &Lazy<Regex> = lazy_regex!(r#"\Ahttps://www.youtube.com/user/([A-Za-z0-9]{1,20})([/#\?].*)?\z"#);
 
         let url = fix_youtube_url(url);
         ensure!(url.starts_with("https://www.youtube.com/"), UnsupportedUrl { url });
+        if let Some(matches) = WATCH_RE.captures(&url) {
+            return Ok(YoutubeDescriptor::Video(matches.get(1).unwrap().as_str().to_string()));
+        }
         if let Some(matches) = OLD_PLAYLIST_RE.captures(&url) {
             return Ok(YoutubeDescriptor::Playlist(matches.get(1).unwrap().as_str().to_string()));
         }
         if let Some(matches) = NEW_PLAYLIST_RE.captures(&url) {
             return Ok(YoutubeDescriptor::Playlist(matches.get(1).unwrap().as_str().to_string()));
-        }
-        if let Some(matches) = WATCH_RE.captures(&url) {
-            return Ok(YoutubeDescriptor::Video(matches.get(1).unwrap().as_str().to_string()));
         }
         if let Some(matches) = CHANNEL_RE.captures(&url) {
             return Ok(YoutubeDescriptor::Channel(matches.get(1).unwrap().as_str().to_string()));
@@ -363,6 +364,12 @@ fn send_reply(client: &IrcClient, channel: &str, user: &str, result: Result<Stri
     }
 }
 
+fn extract_url(msg: &str) -> Result<&str> {
+    let url = msg.split(' ').take(2).last().unwrap();
+    ensure!(url.len() <= 200, UrlTooLong);
+    Ok(url)
+}
+
 pub fn dispatch_message(message: &str, user: &str, rtd: &Rtd, check_authorization: impl Fn() -> Result<()>) -> Result<Vec<Result<String>>> {
     Ok(match message {
         "!help" => {
@@ -380,7 +387,7 @@ pub fn dispatch_message(message: &str, user: &str, rtd: &Rtd, check_authorizatio
             vec![cont_scripts()]
         },
         msg if msg.starts_with("!s ") => {
-            let url_or_folder = msg.split(' ').take(2).last().unwrap();
+            let url_or_folder = extract_url(msg)?;
             if url_or_folder.starts_with("https://") || url_or_folder.starts_with("http://") {
                 let descriptor = YoutubeDescriptor::from_url(&url_or_folder)?.canonicalize()?;
                 vec![check_stash(&descriptor)]
@@ -390,13 +397,13 @@ pub fn dispatch_message(message: &str, user: &str, rtd: &Rtd, check_authorizatio
         },
         msg if msg.starts_with("!a ") => {
             check_authorization()?;
-            let url = msg.split(' ').take(2).last().unwrap();
+            let url = extract_url(msg)?;
             let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
             vec![archive(&url, &descriptor, VideoSize::Normal, &user, &rtd)]
         },
         msg if msg.starts_with("!sa ") => {
             check_authorization()?;
-            let url = msg.split(' ').take(2).last().unwrap();
+            let url = extract_url(msg)?;
             let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
             vec![
                 check_stash(&descriptor),
@@ -405,13 +412,13 @@ pub fn dispatch_message(message: &str, user: &str, rtd: &Rtd, check_authorizatio
         },
         msg if msg.starts_with("!averybig ") => {
             check_authorization()?;
-            let url = msg.split(' ').take(2).last().unwrap();
+            let url = extract_url(msg)?;
             let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
             vec![archive(&url, &descriptor, VideoSize::VeryBig, &user, &rtd)]
         },
         msg if msg.starts_with("!saverybig ") => {
             check_authorization()?;
-            let url = msg.split(' ').take(2).last().unwrap();
+            let url = extract_url(msg)?;
             let descriptor = YoutubeDescriptor::from_url(&url)?.canonicalize()?;
             vec![
                 check_stash(&descriptor),
@@ -420,7 +427,7 @@ pub fn dispatch_message(message: &str, user: &str, rtd: &Rtd, check_authorizatio
         },
         msg if msg.starts_with("!abort ") => {
             check_authorization()?;
-            let task = msg.split(' ').take(2).last().unwrap();
+            let task = extract_url(msg)?;
             vec![abort(&task)]
         },
         _other => vec![],
@@ -478,20 +485,39 @@ mod tests {
 
     #[test]
     fn test_descriptor() {
-        assert_eq!(
-            YoutubeDescriptor::from_url("https://www.youtube.com/channel/UChBBWt5H8uZW1LSOh_aPt2Q/videos").unwrap(),
-            YoutubeDescriptor::Channel("UChBBWt5H8uZW1LSOh_aPt2Q".to_string()));
-        assert_eq!(
-            YoutubeDescriptor::from_url("https://www.youtube.com/user/jblow888/videos").unwrap(),
-            YoutubeDescriptor::User("jblow888".to_string()));
-        assert_eq!(
-            YoutubeDescriptor::from_url("https://www.youtube.com/playlist?list=PL5AC656794EE191C1").unwrap(),
-            YoutubeDescriptor::Playlist("PL5AC656794EE191C1".to_string()));
-        assert_eq!(
-            YoutubeDescriptor::from_url("https://www.youtube.com/playlist?list=PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF").unwrap(),
-            YoutubeDescriptor::Playlist("PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF".to_string()));
-        assert_eq!(
-            YoutubeDescriptor::from_url("https://www.youtube.com/watch?v=YdSdvIRkkDY").unwrap(),
-            YoutubeDescriptor::Video("YdSdvIRkkDY".to_string()));
+        for trailing_crud in ["", "?", "?stuff", "#", "#stuff"].iter() {
+            assert_eq!(
+                YoutubeDescriptor::from_url(&format!("https://www.youtube.com/channel/UChBBWt5H8uZW1LSOh_aPt2Q{}", trailing_crud)).unwrap(),
+                YoutubeDescriptor::Channel("UChBBWt5H8uZW1LSOh_aPt2Q".to_string()));
+            assert_eq!(
+                YoutubeDescriptor::from_url(&format!("https://www.youtube.com/channel/UChBBWt5H8uZW1LSOh_aPt2Q/videos{}", trailing_crud)).unwrap(),
+                YoutubeDescriptor::Channel("UChBBWt5H8uZW1LSOh_aPt2Q".to_string()));
+            assert_eq!(
+                YoutubeDescriptor::from_url(&format!("https://www.youtube.com/user/jblow888{}", trailing_crud)).unwrap(),
+                YoutubeDescriptor::User("jblow888".to_string()));
+            assert_eq!(
+                YoutubeDescriptor::from_url(&format!("https://www.youtube.com/user/jblow888/videos{}", trailing_crud)).unwrap(),
+                YoutubeDescriptor::User("jblow888".to_string()));
+        }
+
+        for trailing_crud in ["", "&", "&stuff", "#", "#stuff"].iter() {
+            assert_eq!(
+                YoutubeDescriptor::from_url(&format!("https://www.youtube.com/playlist?list=PL5AC656794EE191C1{}", trailing_crud)).unwrap(),
+                YoutubeDescriptor::Playlist("PL5AC656794EE191C1".to_string()));
+            assert_eq!(
+                YoutubeDescriptor::from_url(&format!("https://www.youtube.com/playlist?list=PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF{}", trailing_crud)).unwrap(),
+                YoutubeDescriptor::Playlist("PL78L-9twndz8fMRU3NpiWSmB5IucqWuTF".to_string()));
+            assert_eq!(
+                YoutubeDescriptor::from_url(&format!("https://www.youtube.com/watch?v=YdSdvIRkkDY{}", trailing_crud)).unwrap(),
+                YoutubeDescriptor::Video("YdSdvIRkkDY".to_string()));
+        }
+
+        for bad_url in [
+            "https://www.youtube.com/channel/UChBBWt5H8uZW1LSOh_aPt2",
+            "https://www.youtube.com/channel/UChBBWt5H8uZW1LSOh_aPt2Qa",
+        ].iter() {
+            let error = format!("{:?}", YoutubeDescriptor::from_url(bad_url));
+            assert!(error.starts_with("Err(UnsupportedUrl {"), error);
+        }
     }
 }
