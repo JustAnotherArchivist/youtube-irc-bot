@@ -357,7 +357,16 @@ fn get_help() -> Result<String> {
     )
 }
 
+/// Munge username for users who prefer not to be highlighted
+fn munge_user(user: &str) -> &str {
+    match user {
+        "ivan" => "𝔦𝔳𝔞𝔫",
+        other => other
+    }
+}
+
 fn send_reply(client: &IrcClient, channel: &str, user: &str, result: Result<String>) {
+    let user = munge_user(user);
     match result {
         Ok(reply) => client.send_privmsg(channel, format!("{}: {}", user, reply)).unwrap(),
         Err(err)  => client.send_privmsg(channel, format!("{}: error: {}", user, err)).unwrap(),
