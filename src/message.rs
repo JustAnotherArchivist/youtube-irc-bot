@@ -360,8 +360,8 @@ fn get_help() -> Result<String> {
 /// Munge username for users who prefer not to be highlighted
 fn munge_user(user: &str) -> &str {
     match user {
-        "ivan" => "𝔦van",
-        "ivan_" => "𝔦van_",
+        "ivan" => "𝔦𝔳𝔞𝔫",
+        "ivan_" => "𝔦𝔳𝔞𝔫_",
         other => other
     }
 }
