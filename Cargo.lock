@@ -1367,7 +1367,7 @@ dependencies = [
 
 [[package]]
 name = "youtube-irc-bot"
-version = "2.1.2"
+version = "2.2.0"
 dependencies = [
  "bytecount 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "directories 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
