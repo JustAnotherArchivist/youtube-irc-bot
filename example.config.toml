@@ -27,3 +27,5 @@ max_messages_in_burst = 15
 should_ghost = false
 
 [user_limits]
+
+[user_highlights]

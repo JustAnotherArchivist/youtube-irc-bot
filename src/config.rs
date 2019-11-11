@@ -21,6 +21,17 @@ pub struct Args {
     pub flag_conf: Option<PathBuf>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub enum HighlightMode {
+    Normal = 0,
+    Fraktur = 1,
+    FrakturBold = 2,
+    Script = 3,
+    Bold = 4,
+    Italic = 5,
+    BoldItalic = 6,
+}
+
 // serde structures defining the configuration file structure
 #[derive(Serialize, Deserialize)]
 #[serde(default)]
@@ -31,6 +42,7 @@ pub struct Conf {
     #[serde(rename = "connection")]
     pub client: IrcConfig,
     pub user_limits: HashMap<String, usize>,
+    pub user_highlights: HashMap<String, HighlightMode>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -99,6 +111,7 @@ impl Default for Conf {
                 ..IrcConfig::default()
             },
             user_limits: HashMap::new(),
+            user_highlights: HashMap::new(),
         }
     }
 }

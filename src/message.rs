@@ -1,12 +1,13 @@
 use irc::client::prelude::*;
 use std::str;
+use std::collections::HashMap;
 use std::process;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::{ensure, ResultExt, Snafu, Backtrace};
 use ::phf::{Map, phf_map};
 
-use super::config::Rtd;
+use super::config::{Rtd, HighlightMode};
 
 enum VideoSize {
     Normal,
@@ -357,17 +358,37 @@ fn get_help() -> Result<String> {
     )
 }
 
-/// Munge username for users who prefer not to be highlighted
-fn munge_user(user: &str) -> &str {
-    match user {
-        "ivan" => "𝔦𝔳𝔞𝔫",
-        "ivan_" => "𝔦𝔳𝔞𝔫_",
-        other => other
+const ALPHA_REGULAR: &str      = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+const ALPHA_FRAKTUR: &str      = "𝔄𝔅ℭ𝔇𝔈𝔉𝔊ℌℑ𝔍𝔎𝔏𝔐𝔑𝔒𝔓𝔔ℜ𝔖𝔗𝔘𝔙𝔚𝔛𝔜ℨ𝔞𝔟𝔠𝔡𝔢𝔣𝔤𝔥𝔦𝔧𝔨𝔩𝔪𝔫𝔬𝔭𝔮𝔯𝔰𝔱𝔲𝔳𝔴𝔵𝔶𝔷";
+const ALPHA_FRAKTUR_BOLD: &str = "𝕬𝕭𝕮𝕯𝕰𝕱𝕲𝕳𝕴𝕵𝕶𝕷𝕸𝕹𝕺𝕻𝕼𝕽𝕾𝕿𝖀𝖁𝖂𝖃𝖄𝖅𝖆𝖇𝖈𝖉𝖊𝖋𝖌𝖍𝖎𝖏𝖐𝖑𝖒𝖓𝖔𝖕𝖖𝖗𝖘𝖙𝖚𝖛𝖜𝖝𝖞𝖟";
+const ALPHA_SCRIPT: &str       = "𝒜ℬ𝒞𝒟ℰℱ𝒢ℋℐ𝒥𝒦ℒℳ𝒩𝒪𝒫𝒬ℛ𝒮𝒯𝒰𝒱𝒲𝒳𝒴𝒵𝒶𝒷𝒸𝒹ℯ𝒻ℊ𝒽𝒾𝒿𝓀𝓁𝓂𝓃ℴ𝓅𝓆𝓇𝓈𝓉𝓊𝓋𝓌𝓍𝓎𝓏";
+const ALPHA_BOLD: &str         = "𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳";
+const ALPHA_ITALIC: &str       = "𝐴𝐵𝐶𝐷𝐸𝐹𝐺𝐻𝐼𝐽𝐾𝐿𝑀𝑁𝑂𝑃𝑄𝑅𝑆𝑇𝑈𝑉𝑊𝑋𝑌𝑍𝑎𝑏𝑐𝑑𝑒𝑓𝑔ℎ𝑖𝑗𝑘𝑙𝑚𝑛𝑜𝑝𝑞𝑟𝑠𝑡𝑢𝑣𝑤𝑥𝑦𝑧";
+const ALPHA_BOLD_ITALIC: &str  = "𝑨𝑩𝑪𝑫𝑬𝑭𝑮𝑯𝑰𝑱𝑲𝑳𝑴𝑵𝑶𝑷𝑸𝑹𝑺𝑻𝑼𝑽𝑾𝑿𝒀𝒁𝒂𝒃𝒄𝒅𝒆𝒇𝒈𝒉𝒊𝒋𝒌𝒍𝒎𝒏𝒐𝒑𝒒𝒓𝒔𝒕𝒖𝒗𝒘𝒙𝒚𝒛";
+
+fn replace_matching_characters(input_str: &str, from_set: &str, to_set: &str) -> String {
+    let mapping = from_set.chars().zip(to_set.chars()).collect::<HashMap<_, _>>();
+    input_str
+        .chars()
+        .map(|c| *mapping.get(&c).unwrap_or(&c))
+        .collect::<String>()
+}
+
+fn highlight_for_user(user: &str, rtd: &Rtd) -> String {
+    let user_highlights = &rtd.conf.user_highlights;
+    match user_highlights.get(user) {
+        Some(HighlightMode::Fraktur)     => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_FRAKTUR),
+        Some(HighlightMode::FrakturBold) => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_FRAKTUR_BOLD),
+        Some(HighlightMode::Script)      => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_SCRIPT),
+        Some(HighlightMode::Bold)        => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_BOLD),
+        Some(HighlightMode::Italic)      => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_ITALIC),
+        Some(HighlightMode::BoldItalic)  => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_BOLD_ITALIC),
+        _ => user.to_string(),
     }
 }
 
-fn send_reply(client: &IrcClient, channel: &str, user: &str, result: Result<String>) {
-    let user = munge_user(user);
+fn send_reply(client: &IrcClient, channel: &str, user: &str, result: Result<String>, rtd: &Rtd) {
+    let user = highlight_for_user(user, rtd);
     match result {
         Ok(reply) => client.send_privmsg(channel, format!("{}: {}", user, reply)).unwrap(),
         Err(err)  => client.send_privmsg(channel, format!("{}: error: {}", user, err)).unwrap(),
@@ -466,7 +487,7 @@ pub fn handle_message(client: &IrcClient, message: &Message, rtd: &Rtd) -> Resul
     let check_authorization = || {
         if let Some(prefix) = &message.prefix {
             if WEBCHAT_RE.is_match(prefix) {
-                send_reply(client, channel, user, Ok(NO_WEBCHAT_MESSAGE.into()));
+                send_reply(client, channel, user, Ok(NO_WEBCHAT_MESSAGE.into()), rtd);
                 return Err(Error::NotAuthorized);
             }
         }
@@ -481,7 +502,7 @@ pub fn handle_message(client: &IrcClient, message: &Message, rtd: &Rtd) -> Resul
             },
             Ok(replies) => {
                 for reply in replies.into_iter() {
-                    send_reply(client, channel, user, reply);
+                    send_reply(client, channel, user, reply, rtd);
                 }
             }
         }
@@ -529,5 +550,12 @@ mod tests {
             let error = format!("{:?}", YoutubeDescriptor::from_url(bad_url));
             assert!(error.starts_with("Err(UnsupportedUrl {"), error);
         }
+    }
+
+    #[test]
+    fn test_replace_matching_characters() {
+        assert_eq!(replace_matching_characters("user", ALPHA_REGULAR, ALPHA_FRAKTUR), "𝔲𝔰𝔢𝔯");
+        assert_eq!(replace_matching_characters("User", ALPHA_REGULAR, ALPHA_FRAKTUR), "𝔘𝔰𝔢𝔯");
+        assert_eq!(replace_matching_characters("_User0", ALPHA_REGULAR, ALPHA_FRAKTUR), "_𝔘𝔰𝔢𝔯0");
     }
 }
