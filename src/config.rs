@@ -23,13 +23,13 @@ pub struct Args {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum HighlightMode {
-    Normal = 0,
-    Fraktur = 1,
-    FrakturBold = 2,
-    Script = 3,
-    Bold = 4,
-    Italic = 5,
-    BoldItalic = 6,
+    Normal,
+    Fraktur,
+    FrakturBold,
+    Script,
+    Bold,
+    Italic,
+    BoldItalic,
 }
 
 // serde structures defining the configuration file structure
