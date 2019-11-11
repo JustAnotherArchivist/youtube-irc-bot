@@ -376,14 +376,18 @@ fn replace_matching_characters(input_str: &str, from_set: &str, to_set: &str) ->
 
 fn highlight_for_user(user: &str, rtd: &Rtd) -> String {
     let user_highlights = &rtd.conf.user_highlights;
-    match user_highlights.get(user) {
-        Some(HighlightMode::Fraktur)     => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_FRAKTUR),
-        Some(HighlightMode::FrakturBold) => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_FRAKTUR_BOLD),
-        Some(HighlightMode::Script)      => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_SCRIPT),
-        Some(HighlightMode::Bold)        => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_BOLD),
-        Some(HighlightMode::Italic)      => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_ITALIC),
-        Some(HighlightMode::BoldItalic)  => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_BOLD_ITALIC),
-        _ => user.to_string(),
+    if let Some(mode) = user_highlights.get(user) {
+        match mode {
+            HighlightMode::Normal      => user.to_string(),
+            HighlightMode::Fraktur     => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_FRAKTUR),
+            HighlightMode::FrakturBold => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_FRAKTUR_BOLD),
+            HighlightMode::Script      => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_SCRIPT),
+            HighlightMode::Bold        => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_BOLD),
+            HighlightMode::Italic      => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_ITALIC),
+            HighlightMode::BoldItalic  => replace_matching_characters(user, ALPHA_REGULAR, ALPHA_BOLD_ITALIC),
+        }
+    } else {
+        user.to_string()
     }
 }
 
