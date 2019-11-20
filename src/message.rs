@@ -230,7 +230,7 @@ fn archive(original_url: &str, descriptor: &CanonicalizedYoutubeDescriptor, vide
             let _ = str::from_utf8(&output.stdout).context(Utf8)?;
         }
     }
-    Ok(format!("Grabbing {} -> {}; check https://ya.borg.xyz/logs/dl/{}/ later", &original_url, &folder, &folder))
+    Ok(format!("Grabbing {} -> {}; check {} later", &original_url, &folder, logs_url(&folder)))
 }
 
 fn assert_valid_task_name(task: &str) -> Result<()> {
@@ -257,6 +257,10 @@ fn limit_for_user(user: &str, rtd: &Rtd) -> usize {
     }
 }
 
+fn logs_url(folder: &str) -> String {
+    format!("https://ya.borg.xyz/logs/dl/{}/", &folder)
+}
+
 fn check_folder(folder: &str) -> Result<String> {
     assert_valid_task_name(folder)?;
     let listing = match get_file_listing(&folder) {
@@ -275,7 +279,7 @@ fn check_folder(folder: &str) -> Result<String> {
         })
         .collect::<Vec<String>>();
     let latest_videos = videos.iter().take(4).collect::<Vec<_>>();
-    Ok(format!("stash has {} videos for {}, latest {:?}", videos.len(), &folder, latest_videos))
+    Ok(format!("stash has {} videos for {} ({}); latest {:?}", videos.len(), &folder, logs_url(&folder), latest_videos))
 }
 
 fn check_stash(descriptor: &CanonicalizedYoutubeDescriptor) -> Result<String> {
