@@ -18,3 +18,7 @@ directories = "2.0.2"
 snafu = "0.6.0"
 bytecount = "0.6.0"
 phf = { version = "0.8.0", features = ["macros"] }
+
+[profile.dev]
+# Reduce debug rebuild time, comment it if you need debug symbols
+debug = false
