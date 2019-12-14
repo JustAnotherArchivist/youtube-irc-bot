@@ -505,7 +505,7 @@ pub fn handle_message(client: &IrcClient, message: &Message, rtd: &Rtd) -> Resul
     if message.response_target() == Some(channel) {
         // Special handling
         if user == "Ryz" && msg.starts_with("!archive ") {
-            client.send(format!("KICK {} Ryz unknown command", channel).as_str()).unwrap();
+            client.send(format!("KICK {} Ryz 不明なコマンドです。", channel).as_str()).unwrap();
         }
 
         let replies = dispatch_message(&msg, &user, &rtd, &check_authorization);
