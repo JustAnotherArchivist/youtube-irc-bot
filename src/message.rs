@@ -104,6 +104,7 @@ fn fix_youtube_url(url: &str) -> String {
     let url = url.replace("https://m.youtube.com/", "https://www.youtube.com/");
     let url = url.replace("https://youtube.com/", "https://www.youtube.com/");
     let url = url.replace("https://youtu.be/", "https://www.youtube.com/watch?v=");
+    let url = url.replace("https://invidio.us/", "https://www.youtube.com/");
     // Fix annoying links that fail to load on mobile
     let url = url.replace("?disable_polymer=1", "");
     let url = url.replace("&disable_polymer=1", "");
